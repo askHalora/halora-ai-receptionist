@@ -110,7 +110,7 @@ flowchart LR
 | # | Workflow | Purpose |
 |---|---|---|
 | 01 | Main | WhatsApp entry point: voice notes, insurance cards, owner mode, voice replies, fallbacks |
-| 02 | Patient Brain | Claude agent with 12 tools, booking verification, reply guards, conversation memory |
+| 02 | Patient Brain | Claude agent with 14 tools, booking verification, reply guards, conversation memory |
 | 03 | Booking Engine | Free slots, book, reschedule, cancel, look up, family bookings (Google Calendar) |
 | 04 | Extra Tools | Price estimates and instalments, location, running late, cancellation log |
 | 05 | Owner Mode | Claude Haiku agent for the owner's `#` commands |
