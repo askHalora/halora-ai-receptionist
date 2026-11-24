@@ -1,0 +1,1121 @@
+{
+  "name": "Noor – Booking Engine",
+  "nodes": [
+    {
+      "id": "b61fd451-0d03-47fb-878c-e608b5e8c5cd",
+      "name": "Booking Request",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        288
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "action",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "type": "string"
+            },
+            {
+              "name": "date",
+              "type": "string"
+            },
+            {
+              "name": "days",
+              "type": "number"
+            },
+            {
+              "name": "start",
+              "type": "string"
+            },
+            {
+              "name": "service",
+              "type": "string"
+            },
+            {
+              "name": "dentist",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "language",
+              "type": "string"
+            },
+            {
+              "name": "new_or_returning",
+              "type": "string"
+            },
+            {
+              "name": "insurance",
+              "type": "string"
+            },
+            {
+              "name": "source",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e33168c5-a4b6-4d5e-bd23-73f7d50c8f07",
+      "name": "Find Patient",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        288
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $('Booking Request').first().json.phone }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "622c9aa3-d20d-484d-bbf7-3eb0c92d39fa",
+      "name": "Prepare Range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        288
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const Z = 'Asia/Dubai';\nconst inp = $('Booking Request').first().json;\nconst action = String(inp.action || '');\nlet from;\nlet to;\nif (action === 'find_slots') {\n  const d = DateTime.fromISO(String(inp.date || ''), { zone: Z });\n  const base = d.isValid ? d : DateTime.now().setZone(Z);\n  from = base.startOf('day');\n  const n = Math.min(Math.max(Number(inp.days) || 1, 1), 7);\n  to = from.plus({ days: n });\n} else if (action === 'book' || action === 'reschedule') {\n  const s = DateTime.fromFormat(String(inp.start || ''), 'yyyy-MM-dd HH:mm', { zone: Z });\n  const base = s.isValid ? s : DateTime.now().setZone(Z);\n  from = base.startOf('day');\n  to = from.plus({ days: 1 });\n} else {\n  from = DateTime.now().setZone(Z).startOf('day');\n  to = from.plus({ days: 1 });\n}\nreturn [{ json: { timeMin: from.toISO(), timeMax: to.toISO() } }];\n"
+      }
+    },
+    {
+      "id": "5c1194d2-d901-41bd-a21e-2630fbd41924",
+      "name": "Get Calendar Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        288
+      ],
+      "parameters": {
+        "resource": "event",
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $json.timeMin }}",
+        "timeMax": "={{ $json.timeMax }}",
+        "options": {
+          "orderBy": "startTime",
+          "recurringEventHandling": "expand"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "0847adbf-2f1d-4c6a-82df-8685c8bc730a",
+      "name": "Booking Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        288
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// ===== Clinic rules =====\n// With the clinic_setup switch ON these come from the Clinic Setup, Prices and Dentists tabs of the Sheet.\n// The values below are the fallback (switch OFF, or the tabs are empty).\nconst Z = 'Asia/Dubai';\nlet DENTISTS = {\n  'Dr. Sara Haddad': ['consult', 'check', 'clean', 'whiten', 'fill', 'root', 'general', 'cosmetic', 'emergency', 'pain', 'تنظيف', 'تبييض', 'حشو', 'كشف', 'فحص', 'عصب', 'طوارئ'],\n  'Dr. Omar Nasser': ['implant', 'extract', 'surgery', 'wisdom', 'root', 'emergency', 'pain', 'consult', 'check', 'زراع', 'خلع', 'جراح', 'عصب', 'طوارئ'],\n  'Dr. Lina Farouk': ['align', 'ortho', 'brace', 'child', 'kid', 'consult', 'check', 'تقويم', 'أطفال', 'طفل']\n};\nlet CLOSED_DATES = ['2026-12-02', '2026-12-03', '2027-01-01'];\nlet MIN_NOTICE_MIN = 60;\nlet MAX_DAYS_AHEAD = 60;\nlet LATE_CANCEL_H = 24;\nlet SLOT = 30;\n// Opening hours by weekday (1 = Monday ... 7 = Sunday): [openHour, openMin, closeHour, closeMin], or null = closed.\nlet HOURS = { 1: [9, 0, 21, 0], 2: [9, 0, 21, 0], 3: [9, 0, 21, 0], 4: [9, 0, 21, 0], 5: [14, 0, 21, 0], 6: [9, 0, 21, 0], 7: [9, 0, 21, 0] };\nlet DURATIONS = [{ words: ['whiten', 'تبييض'], minutes: 90 }];\nlet CLINIC_PLACE = 'BrightSmile Dental, Jumeirah';\nlet LOCATION = 'BrightSmile Dental, Jumeirah, Dubai (demo)';\n// =====================================\n\n// Switches: family_bookings and clinic_setup (Noor Settings). Missing or unreadable = OFF.\nconst SW = {};\ntry { $('Get Family Switch').all().forEach(function (i) { const r = i.json || {}; if (r.feature) SW[String(r.feature).trim()] = String(r.enabled).trim().toUpperCase() === 'TRUE'; }); } catch (e) { /* off */ }\nconst familyOn = !!SW.family_bookings;\n\nif (SW.clinic_setup) {\n  try {\n    const rows = $('Get Setup').all().map(function (i) { return i.json || {}; }).filter(function (r) { return r.tab; })\n      .sort(function (a, b) { return Number(a.sort || 0) - Number(b.sort || 0); });\n    const c = {};\n    rows.filter(function (r) { return r.tab === 'clinic'; }).forEach(function (r) { c[r.name] = String(r.value || '').trim(); });\n    const words = function (v) { return String(v || '').toLowerCase().split(',').map(function (w) { return w.trim(); }).filter(Boolean); };\n    const dent = {};\n    rows.filter(function (r) { return r.tab === 'dentist' && r.name; }).forEach(function (r) { dent[String(r.name).trim()] = words(r.words); });\n    if (Object.keys(dent).length) DENTISTS = dent;\n    const DAYNUM = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };\n    const h = {};\n    let anyHours = false;\n    Object.keys(DAYNUM).forEach(function (d) {\n      const v = String(c['hours_' + d] || '').trim();\n      const m = v.match(/^(\\d{1,2}):(\\d{2})\\s*-\\s*(\\d{1,2}):(\\d{2})$/);\n      if (m) { h[DAYNUM[d]] = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])]; anyHours = true; }\n      else if (/closed/i.test(v)) { h[DAYNUM[d]] = null; anyHours = true; }\n      else h[DAYNUM[d]] = HOURS[DAYNUM[d]];\n    });\n    if (anyHours) HOURS = h;\n    if (c.closed_dates !== undefined) CLOSED_DATES = String(c.closed_dates).split(/[,;\\s]+/).filter(function (x) { return /^\\d{4}-\\d{2}-\\d{2}$/.test(x); });\n    if (Number(c.min_notice_minutes) >= 0 && c.min_notice_minutes !== undefined && c.min_notice_minutes !== '') MIN_NOTICE_MIN = Number(c.min_notice_minutes);\n    if (Number(c.max_days_ahead) > 0) MAX_DAYS_AHEAD = Number(c.max_days_ahead);\n    if (Number(c.late_cancel_hours) >= 0 && c.late_cancel_hours) LATE_CANCEL_H = Number(c.late_cancel_hours);\n    if (Number(c.slot_minutes) >= 10) SLOT = Number(c.slot_minutes);\n    const durs = rows.filter(function (r) { return r.tab === 'price' && Number(r.minutes) > 0; }).map(function (r) { return { words: words(r.words), minutes: Number(r.minutes) }; });\n    if (durs.length) DURATIONS = durs;\n    if (c.clinic_name) {\n      CLINIC_PLACE = c.clinic_name + (c.address ? ', ' + c.address : '');\n      LOCATION = CLINIC_PLACE;\n    }\n  } catch (e) { /* keep fallback values */ }\n}\n\nconst ALL = Object.keys(DENTISTS);\nconst inp = $('Booking Request').first().json;\nconst row = $('Find Patient').first().json || {};\nconst range = $('Prepare Range').first().json;\nconst events = $input.all().map(i => i.json).filter(e => e && e.start && (e.start.dateTime || e.start.date) && e.status !== 'cancelled');\nconst now = DateTime.now().setZone(Z);\nconst nowStr = now.toFormat('yyyy-MM-dd HH:mm');\n\nfunction firstName(n) { return String(n || '').toLowerCase().replace(/[^a-z؀-ۿ ]/g, ' ').trim().split(/\\s+/)[0] || ''; }\nfunction duration(service) {\n  const s = String(service || '').toLowerCase();\n  const d = DURATIONS.find(function (x) { return x.words.some(function (w) { return s.includes(w); }); });\n  return d ? d.minutes : SLOT;\n}\nfunction eligible(service, wanted) {\n  if (wanted) {\n    const last = String(wanted).toLowerCase().replace('dr.', '').trim().split(' ').pop();\n    const w = ALL.find(d => d.toLowerCase().includes(last));\n    if (w) return [w];\n  }\n  const s = String(service || '').toLowerCase();\n  const list = ALL.filter(d => DENTISTS[d].some(k => s.includes(k)));\n  return list.length ? list : ALL;\n}\nfunction hours(day) {\n  if (CLOSED_DATES.includes(day.toFormat('yyyy-MM-dd'))) return null;\n  const h = HOURS[day.weekday];\n  if (!h) return null;\n  return { open: day.set({ hour: h[0], minute: h[1], second: 0, millisecond: 0 }), close: day.set({ hour: h[2], minute: h[3], second: 0, millisecond: 0 }) };\n}\nfunction dentistOf(ev) {\n  const t = String(ev.description || '') + ' ' + String(ev.summary || '');\n  return ALL.find(x => t.includes(x)) || null; // events without a dentist block everyone\n}\nfunction busy(dentist, s, e, ignoreId) {\n  return events.some(ev => {\n    if (ignoreId && ev.id === ignoreId) return false;\n    const es = DateTime.fromISO(ev.start.dateTime || ev.start.date, { zone: Z });\n    const ee = DateTime.fromISO((ev.end && (ev.end.dateTime || ev.end.date)) || ev.start.dateTime, { zone: Z });\n    const d = dentistOf(ev);\n    if (d && d !== dentist) return false;\n    return s < ee && es < e;\n  });\n}\nfunction invalid(s, dur) {\n  const h = hours(s.startOf('day'));\n  if (!h) return 'The clinic is closed on that day.';\n  if (s < now.plus({ minutes: MIN_NOTICE_MIN })) return 'That time is in the past or too soon (we need at least ' + MIN_NOTICE_MIN + ' minutes notice).';\n  if (s > now.plus({ days: MAX_DAYS_AHEAD })) return 'We only book up to ' + MAX_DAYS_AHEAD + ' days ahead.';\n  if (s < h.open || s.plus({ minutes: dur }) > h.close) return 'That time is outside opening hours.';\n  if (s.diff(h.open, 'minutes').minutes % SLOT !== 0) return 'Appointments start every ' + SLOT + ' minutes from opening time.';\n  return null;\n}\nfunction fmt(s) { return s.toFormat('cccc d LLLL, h:mm a'); }\nfunction reply(ok, message) { return [{ json: { op: 'reply', ok, message } }]; }\n\nconst action = String(inp.action || '');\nconst service = String(inp.service || row.service || '');\n\nlet existing = null;\nif (row.calendar_event_id && row.appointment_start && /booked|confirmed/i.test(String(row.status || ''))) {\n  const es = DateTime.fromFormat(String(row.appointment_start), 'yyyy-MM-dd HH:mm', { zone: Z });\n  if (es.isValid && es > now) existing = { start: es, id: String(row.calendar_event_id), dentist: String(row.dentist || ''), service: String(row.service || '') };\n}\n\nif (action === 'find_slots') {\n  const dur = duration(service);\n  const base = DateTime.fromISO(range.timeMin, { zone: Z });\n  const days = Math.round(DateTime.fromISO(range.timeMax, { zone: Z }).diff(base, 'days').days);\n  const docs = eligible(service, inp.dentist);\n  const lines = [];\n  const web = String(inp.source || '') === 'web';\n  const all = [];\n  for (let i = 0; i < days; i++) {\n    const day = base.plus({ days: i });\n    const h = hours(day);\n    if (!h) { lines.push(day.toFormat('cccc d LLLL') + ': closed'); continue; }\n    const slots = [];\n    for (let s = h.open; s.plus({ minutes: dur }) <= h.close; s = s.plus({ minutes: SLOT })) {\n      if (invalid(s, dur)) continue;\n      const d = docs.find(doc => !busy(doc, s, s.plus({ minutes: dur })));\n      if (d) { slots.push(s.toFormat('HH:mm') + ' (' + d + ')'); all.push({ date: day.toFormat('yyyy-MM-dd'), time: s.toFormat('HH:mm'), dentist: d }); }\n    }\n    lines.push(day.toFormat('cccc d LLLL (yyyy-MM-dd)') + ': ' + (slots.length ? slots.slice(0, 12).join(', ') + (slots.length > 12 ? ' (+' + (slots.length - 12) + ' more later in the day)' : '') : 'fully booked'));\n  }\n  let msg = 'Free ' + dur + '-minute slots for \"' + (service || 'consultation') + '\" (Dubai time). Offer the patient up to 3 that fit what they asked:\\n' + lines.join('\\n');\n  if (existing) msg += '\\nNote: this patient already has a booking on ' + fmt(existing.start) + ' with ' + existing.dentist + '.';\n  const res = reply(true, msg);\n  if (web) res[0].json.slots = all; // online booking page needs every free slot\n  return res;\n}\n\nif (action === 'my_booking') {\n  return reply(true, existing ? 'Upcoming booking: ' + existing.service + ' on ' + fmt(existing.start) + ' with ' + existing.dentist + '.' : 'This patient has no upcoming booking.');\n}\n\nif (action === 'book' || action === 'reschedule') {\n  const s = DateTime.fromFormat(String(inp.start || ''), 'yyyy-MM-dd HH:mm', { zone: Z });\n  if (!s.isValid) return reply(false, 'Invalid start time. Use YYYY-MM-DD HH:mm in Dubai time.');\n  // Family booking: same phone, a different person (different first name) than the one already booked.\n  const wantName = String(inp.name || '').trim();\n  const family = action === 'book' && !!existing && familyOn && !!firstName(wantName) && !!firstName(row.name) && firstName(wantName) !== firstName(row.name);\n  if (action === 'book' && existing && !family) return reply(false, 'This patient already has a booking on ' + fmt(existing.start) + '. Ask whether they want to move it (reschedule_appointment) instead.');\n  if (action === 'reschedule' && !existing) return reply(false, 'This patient has no upcoming booking to move. Use book_appointment instead.');\n  const svc = action === 'reschedule' ? (existing.service || service) : service;\n  if (!svc) return reply(false, 'The service is missing. Ask the patient which service they need.');\n  const dur = duration(svc);\n  const why = invalid(s, dur);\n  if (why) return reply(false, why + ' Use find_free_slots and offer valid times.');\n  const ignore = action === 'reschedule' ? existing.id : null;\n  const docs = eligible(svc, inp.dentist || (action === 'reschedule' ? existing.dentist : ''));\n  const doc = docs.find(d => !busy(d, s, s.plus({ minutes: dur }), ignore));\n  if (!doc) return reply(false, 'That slot is no longer free. Use find_free_slots and offer other times.');\n  const name = String(inp.name || row.name || '').trim();\n  if (action === 'book' && !name) return reply(false, \"The patient's full name is missing. Ask for it first.\");\n  if (family) {\n    return [{ json: {\n      op: 'create_family', ok: true, location: LOCATION,\n      start: s.toISO(), end: s.plus({ minutes: dur }).toISO(),\n      summary: svc + ' – ' + name,\n      description: 'Booked by Noor on WhatsApp for a family member. Contact phone: +' + inp.phone + '. Dentist: ' + doc + '.',\n      message: 'Booked for ' + name + ': ' + svc + ' on ' + fmt(s) + ' with ' + doc + ' at ' + CLINIC_PLACE + '. This is a second booking on the same phone, so it is in the calendar but not in the patient record. Confirm this to the patient. If they later ask to move or cancel it, do not use the cancel or reschedule tools (they would change the first booking): ask the team through a request.'\n    } }];\n  }\n  return [{ json: {\n    op: action === 'book' ? 'create' : 'update', ok: true, location: LOCATION,\n    eventId: ignore || '', start: s.toISO(), end: s.plus({ minutes: dur }).toISO(),\n    summary: svc + ' – ' + (name || 'Patient'),\n    description: 'Booked by Noor on ' + (String(inp.source || '') === 'web' ? 'the online booking page' : 'WhatsApp') + '. Patient phone: +' + inp.phone + '. Dentist: ' + doc + '.',\n    sheet: {\n      phone: String(inp.phone), name, language: String(inp.language || row.language || ''),\n      new_or_returning: String(inp.new_or_returning || row.new_or_returning || ''), service: svc,\n      insurance: String(inp.insurance || row.insurance || ''), status: 'booked',\n      appointment_start: s.toFormat('yyyy-MM-dd HH:mm'), dentist: doc, last_message_at: nowStr\n    },\n    message: (action === 'book' ? 'Booked: ' : 'Moved to: ') + svc + ' on ' + fmt(s) + ' with ' + doc + ' at ' + CLINIC_PLACE + '. Confirm this to the patient.'\n  } }];\n}\n\nif (action === 'cancel') {\n  if (!existing) return reply(false, 'This patient has no upcoming booking to cancel.');\n  const late = existing.start.diff(now, 'hours').hours < LATE_CANCEL_H;\n  return [{ json: {\n    op: 'delete', ok: true, eventId: existing.id,\n    sheet: { phone: String(inp.phone), status: 'cancelled', appointment_start: '', dentist: '', calendar_event_id: '', last_message_at: nowStr },\n    message: 'Cancelled the ' + existing.service + ' appointment on ' + fmt(existing.start) + '.' + (late ? ' It was less than ' + LATE_CANCEL_H + ' hours before the visit, so mention the ' + LATE_CANCEL_H + '-hour notice policy kindly.' : '') + ' Tell the patient and offer a new time.'\n  } }];\n}\n\nreturn reply(false, 'Unknown action: ' + action);\n"
+      }
+    },
+    {
+      "id": "327ed890-a6e2-415f-b1c0-acd1c3330ed0",
+      "name": "What To Do?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        256
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.op }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "create"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "create",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.op }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "update"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "update",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.op }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "delete"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "delete",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.op }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "create_family"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "create_family",
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "reply only"
+        }
+      }
+    },
+    {
+      "id": "27bbbe83-705b-472a-945d-dded4a852a62",
+      "name": "Create Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "resource": "event",
+        "operation": "create",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "start": "={{ $json.start }}",
+        "end": "={{ $json.end }}",
+        "useDefaultReminders": true,
+        "additionalFields": {
+          "summary": "={{ $json.summary }}",
+          "description": "={{ $json.description }}",
+          "location": "={{ $json.location || 'BrightSmile Dental, Jumeirah, Dubai (demo)' }}"
+        }
+      }
+    },
+    {
+      "id": "30aa9cb1-97ca-4731-847a-e33a03cff8b6",
+      "name": "Save Booking",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "value": {
+            "phone": "={{ $('Booking Engine').item.json.sheet.phone }}",
+            "name": "={{ $('Booking Engine').item.json.sheet.name }}",
+            "language": "={{ $('Booking Engine').item.json.sheet.language }}",
+            "new_or_returning": "={{ $('Booking Engine').item.json.sheet.new_or_returning }}",
+            "service": "={{ $('Booking Engine').item.json.sheet.service }}",
+            "insurance": "={{ $('Booking Engine').item.json.sheet.insurance }}",
+            "status": "booked",
+            "appointment_start": "={{ $('Booking Engine').item.json.sheet.appointment_start }}",
+            "dentist": "={{ $('Booking Engine').item.json.sheet.dentist }}",
+            "calendar_event_id": "={{ $json.id }}",
+            "last_message_at": "={{ $('Booking Engine').item.json.sheet.last_message_at }}"
+          },
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "new_or_returning",
+              "displayName": "new_or_returning",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "insurance",
+              "displayName": "insurance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appointment_start",
+              "displayName": "appointment_start",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dentist",
+              "displayName": "dentist",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_message_at",
+              "displayName": "last_message_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "059d2e2a-47e8-42ba-9b6a-3687f05db10b",
+      "name": "Tool Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1792,
+        288
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response",
+              "name": "response",
+              "type": "string",
+              "value": "={{ $('Booking Engine').item.json.message }}"
+            },
+            {
+              "id": "ok",
+              "name": "ok",
+              "type": "boolean",
+              "value": "={{ $('Booking Engine').item.json.ok === true }}"
+            },
+            {
+              "id": "slots",
+              "name": "slots",
+              "type": "array",
+              "value": "={{ $('Booking Engine').item.json.slots || [] }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4f7f9957-a896-4e94-959d-d86e61317a18",
+      "name": "Move Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "resource": "event",
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "eventId": "={{ $json.eventId }}",
+        "useDefaultReminders": true,
+        "updateFields": {
+          "start": "={{ $json.start }}",
+          "end": "={{ $json.end }}",
+          "summary": "={{ $json.summary }}",
+          "description": "={{ $json.description }}"
+        }
+      }
+    },
+    {
+      "id": "3fb5a382-f7cc-442f-89a5-60f76793a93a",
+      "name": "Save New Time",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        192
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "value": {
+            "phone": "={{ $('Booking Engine').item.json.sheet.phone }}",
+            "status": "booked",
+            "appointment_start": "={{ $('Booking Engine').item.json.sheet.appointment_start }}",
+            "dentist": "={{ $('Booking Engine').item.json.sheet.dentist }}",
+            "last_message_at": "={{ $('Booking Engine').item.json.sheet.last_message_at }}"
+          },
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appointment_start",
+              "displayName": "appointment_start",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dentist",
+              "displayName": "dentist",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_message_at",
+              "displayName": "last_message_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "690e59bf-e89d-4102-9b1a-e1e42538b4fd",
+      "name": "Delete Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        384
+      ],
+      "parameters": {
+        "resource": "event",
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "eventId": "={{ $json.eventId }}",
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6154d186-c1f3-4ed3-afd3-ee99276721b2",
+      "name": "Save Cancellation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        384
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "value": {
+            "phone": "={{ $('Booking Engine').item.json.sheet.phone }}",
+            "status": "cancelled",
+            "appointment_start": "",
+            "dentist": "",
+            "calendar_event_id": "",
+            "last_message_at": "={{ $('Booking Engine').item.json.sheet.last_message_at }}"
+          },
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appointment_start",
+              "displayName": "appointment_start",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dentist",
+              "displayName": "dentist",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendar_event_id",
+              "displayName": "calendar_event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_message_at",
+              "displayName": "last_message_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "9f053555-a094-4bba-9491-f14efe898873",
+      "name": "Get Family Switch",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        432
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "feature",
+              "keyValue": "family_bookings"
+            },
+            {
+              "condition": "eq",
+              "keyName": "feature",
+              "keyValue": "clinic_setup"
+            }
+          ]
+        },
+        "limit": 10,
+        "matchType": "anyCondition",
+        "operation": "get",
+        "resource": "row",
+        "returnAll": false
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e91467ca-c731-439d-85b2-a845b776e593",
+      "name": "Create Family Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        576
+      ],
+      "parameters": {
+        "additionalFields": {
+          "description": "={{ $json.description }}",
+          "location": "={{ $json.location || 'BrightSmile Dental, Jumeirah, Dubai (demo)' }}",
+          "summary": "={{ $json.summary }}"
+        },
+        "calendar": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "end": "={{ $json.end }}",
+        "operation": "create",
+        "resource": "event",
+        "start": "={{ $json.start }}",
+        "useDefaultReminders": true
+      }
+    },
+    {
+      "id": "af75b322-275a-446a-bca1-2298945a5267",
+      "name": "Get Setup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        576
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "a01df326-5194-4754-8656-a3c1ee880b55",
+      "name": "Test Dry Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        460
+      ],
+      "parameters": {
+        "jsCode": "// Test phones (9715000009...) are used by the Test Suite: never write to the calendar or the Sheet for them.\nconst r = $input.first().json;\nconst ph = String($('Booking Request').first().json.phone || '').replace(/\\D/g, '');\nif (/^000000000000/.test(ph) && ['create', 'update', 'delete', 'create_family'].indexOf(r.op) >= 0) {\n  return [{ json: { op: 'reply', ok: true, message: r.message, test_dry_run: true } }];\n}\nreturn [{ json: r }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "2a70056b-c395-447b-b89a-ccdbb65a2bbf",
+      "name": "Family Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        576
+      ],
+      "parameters": {
+        "jsCode": "// Family booking row for the Family Bookings tab, so reminders and review requests work for family members too.\nconst be = $('Booking Engine').first().json;\nconst inp = $('Booking Request').first().json;\nconst ev = $input.first().json || {};\nconst s = DateTime.fromISO(String(be.start), { zone: 'Asia/Dubai' });\nconst dm = String(be.description || '').match(/Dentist: (.+?)\\.$/);\nreturn [{ json: {\n  key: String(ev.id || ''), phone: String(inp.phone || ''), name: String(inp.name || ''), service: String(inp.service || ''),\n  appointment_start: s.isValid ? s.toFormat('yyyy-MM-dd HH:mm') : '', dentist: dm ? dm[1] : '', status: 'booked',\n  calendar_event_id: String(ev.id || ''), booked_at: DateTime.now().setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm'),\n  reminder_24h_sent: '', reminder_2h_sent: '', review_requested: ''\n} }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "1c6804eb-0d3e-444d-9bb2-2877c6af04e9",
+      "name": "Save Family Booking",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1792,
+        576
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "schema": [],
+          "value": {}
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "append",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Find Patient": {
+      "main": [
+        [
+          {
+            "node": "Prepare Range",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Range": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Events": {
+      "main": [
+        [
+          {
+            "node": "Booking Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "What To Do?": {
+      "main": [
+        [
+          {
+            "node": "Create Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Move Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Family Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Event": {
+      "main": [
+        [
+          {
+            "node": "Save Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Booking": {
+      "main": [
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move Event": {
+      "main": [
+        [
+          {
+            "node": "Save New Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save New Time": {
+      "main": [
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Event": {
+      "main": [
+        [
+          {
+            "node": "Save Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Cancellation": {
+      "main": [
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Request": {
+      "main": [
+        [
+          {
+            "node": "Get Family Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Family Switch": {
+      "main": [
+        [
+          {
+            "node": "Get Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Setup": {
+      "main": [
+        [
+          {
+            "node": "Find Patient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Engine": {
+      "main": [
+        [
+          {
+            "node": "Test Dry Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Dry Run": {
+      "main": [
+        [
+          {
+            "node": "What To Do?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Family Event": {
+      "main": [
+        [
+          {
+            "node": "Family Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Family Row": {
+      "main": [
+        [
+          {
+            "node": "Save Family Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Family Booking": {
+      "main": [
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

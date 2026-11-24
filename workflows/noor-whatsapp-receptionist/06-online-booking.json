@@ -1,0 +1,1136 @@
+{
+  "name": "Noor – Online Booking",
+  "nodes": [
+    {
+      "id": "874f13c1-df8d-4e14-930c-dc42c2feaa50",
+      "name": "Booking Page",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "your-webhook-path",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "e5761b57-9e66-41be-b947-4204b9417383",
+      "name": "Send Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        },
+        "respondWith": "text",
+        "responseBody": "<!doctype html>\n<html lang=\"en\" dir=\"ltr\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Book an appointment</title>\n<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap\">\n<style>\n:root{--brand:#0f766e;--brand-2:#14b8a6;--brand-soft:#e6f6f3;--ink:#0f2a2a;--muted:#5f7472;--line:#e3ecea;--bg:#f3f8f7;--card:#fff;--err:#b91c1c}\n*{box-sizing:border-box}\nhtml,body{overflow-x:hidden}\nbody{margin:0;font-family:\"Plus Jakarta Sans\",system-ui,-apple-system,\"Segoe UI\",Tahoma,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}\nhtml[dir=rtl] body{font-family:\"IBM Plex Sans Arabic\",\"Segoe UI\",Tahoma,sans-serif}\n.hero{background:linear-gradient(135deg,#0b5f58 0%,var(--brand) 45%,var(--brand-2) 100%);color:#fff;padding:20px 16px 72px;position:relative;overflow:hidden}\n.hero::after{content:\"\";position:absolute;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.08);top:-90px;inset-inline-end:-70px}\n.hero-in{max-width:680px;margin:0 auto;position:relative;z-index:1}\n.top{display:flex;justify-content:space-between;align-items:center;gap:12px}\n.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;min-width:0}\n.logo{flex:none;width:38px;height:38px;border-radius:12px;background:#fff;color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:18px}\n.lang{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}\n.hero h1{font-size:clamp(24px,6vw,32px);line-height:1.2;margin:22px 0 6px;letter-spacing:-.01em}\n.hero p{margin:0;opacity:.92;font-size:15px}\n.trust{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}\n.trust span.b{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:5px 11px;font-size:13px}\nmain{max-width:680px;margin:-52px auto 0;padding:0 16px;position:relative;z-index:2}\n.progress{height:6px;background:rgba(255,255,255,.35);border-radius:99px;overflow:hidden;margin:0 4px 14px}\n#bar{height:100%;width:0;background:#fff;transition:width .35s ease}\n.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 8px 24px -18px rgba(15,42,42,.35)}\nh2{font-size:17px;margin:0 0 14px;display:flex;align-items:center;gap:10px}\n.step{flex:none;width:28px;height:28px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-size:14px;font-weight:700;transition:all .2s}\n.card.done .step{background:var(--brand);color:#fff;font-size:0}\n.card.done .step::before{content:\"✓\";font-size:15px}\n#service{display:none}\n.svcs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}\n@media (max-width:420px){.svcs{grid-template-columns:1fr}}\n.svc{font:inherit;text-align:start;border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;background:#fff;cursor:pointer;display:flex;flex-direction:column;gap:4px;transition:border-color .15s,background .15s,transform .1s}\n.svc:hover{border-color:var(--brand-2)}\n.svc:active{transform:scale(.98)}\n.svc-name{font-weight:600;font-size:15px;color:var(--ink)}\n.svc-meta{font-size:13px;color:var(--muted)}\n.svc.sel{border-color:var(--brand);background:var(--brand-soft);box-shadow:inset 0 0 0 1px var(--brand)}\n.days{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:thin}\n.day{flex:0 0 auto;border:1.5px solid var(--line);border-radius:14px;padding:8px 6px;text-align:center;cursor:pointer;background:#fff;min-width:62px;transition:all .15s}\n.day small{display:block;color:var(--muted);font-size:12px}\n.day b{font-size:20px;display:block;line-height:1.3}\n.day.sel{border-color:var(--brand);background:var(--brand);color:#fff}\n.day.sel small{color:rgba(255,255,255,.85)}\n.day.off{opacity:.35;cursor:default;background:#f6f8f8}\n.period{grid-column:1/-1;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:6px}\nhtml[dir=rtl] .period{letter-spacing:0}\n.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px;margin-top:6px}\n.slot{font:inherit;border:1.5px solid var(--line);border-radius:12px;padding:10px 4px;text-align:center;cursor:pointer;background:#fff;font-size:15px;font-weight:600;color:var(--ink);transition:all .15s}\n.slot:hover{border-color:var(--brand-2)}\n.slot.sel{border-color:var(--brand);background:var(--brand);color:#fff}\n.muted{color:var(--muted);font-size:14px}\n#price{display:none}\nlabel{display:block;font-size:14px;font-weight:600;margin:12px 0 6px;color:var(--ink)}\n.opt{font-weight:400;color:var(--muted)}\ninput[type=text],input[type=tel],input[type=email]{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;font:inherit;font-size:16px;background:#fbfdfc;transition:border-color .15s,box-shadow .15s}\ninput:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px rgba(15,118,110,.12);background:#fff}\n.check{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:14px}\n.check input{width:18px;height:18px;margin-top:2px;accent-color:var(--brand);flex:none}\n.check label{font-weight:400;margin:0}\n.secure{font-size:12px;color:var(--muted);margin:12px 0 0}\n.summary{position:sticky;bottom:0;margin:0 -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(255,255,255,.97);backdrop-filter:blur(8px);border-top:1px solid var(--line);z-index:5;box-shadow:0 -10px 24px -20px rgba(15,42,42,.5)}\n.summary-in{max-width:648px;margin:0 auto;display:flex;align-items:center;gap:12px}\n.sum-txt{flex:1;min-width:0}\n.sum-txt small{display:block;color:var(--muted);font-size:12px;font-weight:600}\n#sumText{font-size:14px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n#sumPrice{font-size:13px;color:var(--brand);font-weight:700}\nbutton.main{flex:none;padding:14px 20px;border:0;border-radius:14px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 10px 20px -10px rgba(15,118,110,.7)}\nbutton.main:disabled{opacity:.45;cursor:default;box-shadow:none}\n.err{color:var(--err);font-size:14px;max-width:648px;margin:6px auto 0}\n.err:empty{display:none}\n.done-card{text-align:center;padding:32px 20px}\n.tick{width:76px;height:76px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;margin:0 auto 14px;font-size:38px;font-weight:700;animation:pop .5s ease}\n@keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}\n.done-card h2{justify-content:center;font-size:24px}\n#okText{font-size:16px;font-weight:600;background:var(--bg);border-radius:14px;padding:14px;margin:6px 0 12px}\na.wa{display:inline-flex;align-items:center;gap:8px;margin-top:6px;padding:13px 20px;border-radius:14px;background:#25d366;color:#fff;text-decoration:none;font-weight:700}\n.hp{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;top:0}\nfooter{text-align:center;color:var(--muted);font-size:12px;padding:20px 16px 28px}\n@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}\n</style>\n</head>\n<body>\n<div class=\"hero\"><div class=\"hero-in\">\n<div class=\"top\"><div class=\"brand\"><div class=\"logo\" id=\"logoL\">B</div><span id=\"clinic\">BrightSmile Dental</span></div><button class=\"lang\" id=\"langBtn\">العربية</button></div>\n<h1 data-t=\"hero\">Book your visit in under a minute</h1>\n<p id=\"addr\">Loading…</p>\n<div class=\"trust\"><span class=\"b\">✓ <span data-t=\"t1\">Instant confirmation</span></span><span class=\"b\">✓ <span data-t=\"t2\">Free changes up to 24h before</span></span><span class=\"b\">✓ <span data-t=\"t3\">English &amp; Arabic</span></span></div>\n</div></div>\n<main>\n<div class=\"progress\"><div id=\"bar\"></div></div>\n<div id=\"flow\">\n<div class=\"card\" id=\"c1\">\n<h2><span class=\"step\">1</span><span data-t=\"s1\">Choose a service</span></h2>\n<select id=\"service\"><option value=\"\" data-t=\"loading\">Loading…</option></select>\n<div class=\"svcs\" id=\"svcCards\"></div>\n<p class=\"muted\" id=\"price\"></p>\n</div>\n<div class=\"card\" id=\"c2\">\n<h2><span class=\"step\">2</span><span data-t=\"s2\">Pick a day</span></h2>\n<div class=\"days\" id=\"days\"></div>\n</div>\n<div class=\"card\" id=\"c3\">\n<h2><span class=\"step\">3</span><span data-t=\"s3\">Pick a time</span></h2>\n<div id=\"slotsInfo\" class=\"muted\"></div>\n<div class=\"slots\" id=\"slots\"></div>\n</div>\n<div class=\"card\" id=\"c4\">\n<h2><span class=\"step\">4</span><span data-t=\"s4\">Your details</span></h2>\n<label for=\"name\" data-t=\"name\">Full name</label>\n<input type=\"text\" id=\"name\" autocomplete=\"name\">\n<label for=\"phone\" data-t=\"phone\">WhatsApp number (with country code)</label>\n<input type=\"tel\" id=\"phone\" inputmode=\"tel\" autocomplete=\"tel\" placeholder=\"+971 50 123 4567\" dir=\"ltr\">\n<div id=\"emailBox\">\n<label for=\"email\"><span data-t=\"email\">Email</span> <span class=\"opt\" data-t=\"optional\">(optional)</span></label>\n<input type=\"email\" id=\"email\" autocomplete=\"email\" placeholder=\"name@example.com\" dir=\"ltr\">\n<div class=\"check\"><input type=\"checkbox\" id=\"offers\"><label for=\"offers\"><span data-t=\"offers\">Send me offers and news by email (you can unsubscribe any time).</span></label></div>\n</div>\n<input type=\"text\" id=\"website\" class=\"hp\" tabindex=\"-1\" autocomplete=\"off\" aria-hidden=\"true\">\n<div class=\"check\"><input type=\"checkbox\" id=\"consent\"><label for=\"consent\"><span data-t=\"consent\">I agree that the clinic may contact me on WhatsApp about this appointment.</span></label></div>\n<p class=\"secure\">🔒 <span data-t=\"secure\">Your details are only used for this appointment.</span></p>\n</div>\n</div>\n<div id=\"ok\" class=\"card done-card\" style=\"display:none\">\n<div class=\"tick\">✓</div>\n<h2 data-t=\"booked\">You're booked!</h2>\n<p id=\"okText\"></p>\n<p class=\"muted\" data-t=\"okHint\">Send us a message on WhatsApp to get your reminder and directions.</p>\n<a class=\"wa\" id=\"waLink\" href=\"#\" target=\"_blank\" rel=\"noopener\" data-t=\"wa\">Message us on WhatsApp</a>\n</div>\n<div class=\"summary\" id=\"sumBox\"><div class=\"summary-in\">\n<div class=\"sum-txt\"><small data-t=\"sum\">Your booking</small><span id=\"sumText\"></span><span id=\"sumPrice\"></span></div>\n<button class=\"main\" id=\"book\" disabled data-t=\"book\">Book appointment</button>\n</div><div class=\"err\" id=\"err\"></div></div>\n</main>\n<footer id=\"foot\"></footer>\n<script>\n(function () {\nvar API = '/webhook/your-webhook-path';\nvar T = {\nen: { s1: 'Choose a service', s2: 'Pick a day', s3: 'Pick a time', s4: 'Your details', loading: 'Loading…', select: 'Select a service…', name: 'Full name', phone: 'WhatsApp number (with country code)', email: 'Email', optional: '(optional)', offers: 'Send me offers and news by email (you can unsubscribe any time).', consent: 'I agree that the clinic may contact me on WhatsApp about this appointment.', book: 'Book appointment', booking: 'Booking…', booked: \"You're booked!\", okHint: 'Send us a message on WhatsApp to get your reminder and directions.', wa: 'Message us on WhatsApp', pickFirst: 'Choose a service and a day first.', checking: 'Checking free times…', free: 'Free times (Dubai time):', none: 'No free times that day. Please try another day.', loadErr: 'Could not load times. Please try again.', net: 'Network problem. Please try again.', from: 'From', min: 'min', title: 'Book at', fail: 'Sorry, that did not work. Please try another time.', badEmail: 'Please check your email address.', closed: 'Booking is not available right now. Please message us on WhatsApp.', waText: 'Hi, I just booked online: ', lang: 'العربية', t1: 'Instant confirmation', t2: 'Free changes up to 24h before', t3: 'English & Arabic', sum: 'Your booking', sumEmpty: 'Choose a service, day and time.', morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', hero: 'Book your visit in under a minute', secure: 'Your details are only used for this appointment.' },\nar: { s1: 'اختر الخدمة', s2: 'اختر اليوم', s3: 'اختر الوقت', s4: 'بياناتك', loading: 'جاري التحميل…', select: 'اختر خدمة…', name: 'الاسم بالكامل', phone: 'رقم الواتساب (مع كود الدولة)', email: 'البريد الإلكتروني', optional: '(اختياري)', offers: 'أرسلوا لي العروض والأخبار على الإيميل (تقدر تلغي الاشتراك في أي وقت).', consent: 'أوافق إن العيادة تتواصل معايا على واتساب بخصوص الموعد ده.', book: 'احجز الموعد', booking: 'جاري الحجز…', booked: 'تم الحجز!', okHint: 'ابعتلنا رسالة على واتساب عشان يوصلك التذكير والعنوان.', wa: 'راسلنا على واتساب', pickFirst: 'اختار الخدمة واليوم الأول.', checking: 'بنشوف المواعيد المتاحة…', free: 'المواعيد المتاحة (بتوقيت دبي):', none: 'مفيش مواعيد متاحة اليوم ده، جرّب يوم تاني.', loadErr: 'معرفناش نحمّل المواعيد، حاول تاني.', net: 'في مشكلة في الاتصال، حاول تاني.', from: 'يبدأ من', min: 'دقيقة', title: 'احجز في', fail: 'عذراً، الحجز ما تمّش. اختار وقت تاني.', badEmail: 'من فضلك راجع الإيميل.', closed: 'الحجز أونلاين مقفول دلوقتي، راسلنا على واتساب.', waText: 'أهلاً، لسه حاجز أونلاين: ', lang: 'English', t1: 'تأكيد فوري', t2: 'تقدر تغيّر الموعد قبلها بـ 24 ساعة', t3: 'عربي وإنجليزي', sum: 'حجزك', sumEmpty: 'اختار الخدمة واليوم والوقت.', morning: 'الصبح', afternoon: 'الضهر', evening: 'بالليل', hero: 'احجز زيارتك في أقل من دقيقة', secure: 'بياناتك بتستخدم للموعد ده بس.' }\n};\nvar SVC_AR = [[/child|kid/i, 'كشف أطفال (من 3 سنين)'], [/emergency/i, 'موعد طوارئ في نفس اليوم'], [/root canal/i, 'علاج عصب'], [/align|brace/i, 'تقويم شفاف'], [/implant/i, 'زراعة أسنان'], [/whiten/i, 'تبييض الأسنان في العيادة'], [/clean/i, 'تنظيف الأسنان'], [/fill/i, 'حشو'], [/extract/i, 'خلع'], [/consult|check/i, 'كشف واستشارة']];\nvar lang = (navigator.language || '').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'en';\ntry { var saved = localStorage.getItem('noor_lang'); if (saved === 'ar' || saved === 'en') lang = saved; } catch (e) {}\nvar state = { service: '', date: '', time: '', dentist: '', cfg: null };\nvar $ = function (id) { return document.getElementById(id); };\nvar t = function (k) { return T[lang][k] || T.en[k] || k; };\nfunction svcLabel(name) { if (lang !== 'ar') return name; for (var i = 0; i < SVC_AR.length; i++) if (SVC_AR[i][0].test(name)) return SVC_AR[i][1]; return name; }\nfunction money(n) { return Number(n).toLocaleString('en-US'); }\nfunction get(params) { return fetch(API + '?' + new URLSearchParams(params).toString()).then(function (r) { return r.json(); }); }\nfunction applyLang() {\ndocument.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';\nArray.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (el) { el.textContent = t(el.getAttribute('data-t')); });\n$('langBtn').textContent = t('lang');\nif (state.cfg) { renderHeader(); renderServices(); renderDays(); showPrice(); }\ncanBook();\nif (!state.service || !state.date) $('slotsInfo').textContent = t('pickFirst');\n}\nfunction updateSummary() {\nvar s = state.cfg && (state.cfg.services || []).find(function (x) { return x.name === state.service; });\nvar parts = [];\nif (s) parts.push(svcLabel(s.name));\nif (state.date) { var dt = new Date(state.date + 'T12:00:00'); parts.push(dt.toLocaleDateString(lang === 'ar' ? 'ar-u-nu-latn' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' })); }\nif (state.time) parts.push(state.time);\n$('sumText').textContent = parts.length ? parts.join(' · ') : t('sumEmpty');\n$('sumPrice').textContent = s ? (s.from ? t('from') + ' ' : '') + state.cfg.currency + ' ' + money(s.price) : '';\nvar d4 = $('name').value.trim().length > 1 && $('phone').value.replace(/\\D/g, '').length >= 8 && $('consent').checked;\n$('c1').classList.toggle('done', !!state.service); $('c2').classList.toggle('done', !!state.date); $('c3').classList.toggle('done', !!state.time); $('c4').classList.toggle('done', d4);\n$('bar').style.width = (([state.service, state.date, state.time].filter(Boolean).length + (d4 ? 1 : 0)) * 25) + '%';\n}\nfunction canBook() {\ntry { updateSummary(); } catch (e) {}\n$('book').disabled = !(state.service && state.date && state.time && $('name').value.trim().length > 1 && $('phone').value.replace(/\\D/g, '').length >= 8 && $('consent').checked);\n}\nfunction renderHeader() {\nvar c = state.cfg;\ndocument.title = t('title') + ' ' + c.clinic;\n$('clinic').textContent = c.clinic; $('logoL').textContent = String(c.clinic || 'B').charAt(0);\n$('addr').textContent = c.closed ? t('closed') : (c.address || '');\n$('foot').textContent = c.clinic + (c.address ? ' · ' + c.address : '');\n$('emailBox').style.display = c.email_capture === false ? 'none' : 'block';\n}\nfunction renderServices() {\nvar sel = $('service'); var cur = state.service; sel.innerHTML = '';\nvar o0 = document.createElement('option'); o0.value = ''; o0.textContent = t('select'); sel.appendChild(o0);\n(state.cfg.services || []).forEach(function (s) { var o = document.createElement('option'); o.value = s.name; o.textContent = svcLabel(s.name); sel.appendChild(o); });\nsel.value = cur;\nvar grid = $('svcCards'); grid.innerHTML = '';\n(state.cfg.services || []).forEach(function (s) {\nvar b = document.createElement('button'); b.type = 'button';\nb.className = 'svc' + (s.name === state.service ? ' sel' : '');\nb.innerHTML = '<span class=\"svc-name\"></span><span class=\"svc-meta\"></span>';\nb.querySelector('.svc-name').textContent = svcLabel(s.name);\nb.querySelector('.svc-meta').textContent = (s.from ? t('from') + ' ' : '') + state.cfg.currency + ' ' + money(s.price) + (s.minutes ? ' · ' + s.minutes + ' ' + t('min') : '');\nb.onclick = function () { sel.value = s.name; sel.onchange(); renderServices(); };\ngrid.appendChild(b);\n});\n}\nfunction showPrice() {\nvar s = (state.cfg.services || []).find(function (x) { return x.name === state.service; });\n$('price').textContent = s ? ((s.from ? t('from') + ' ' : '') + state.cfg.currency + ' ' + money(s.price) + (s.minutes ? ' · ' + s.minutes + ' ' + t('min') : '')) : '';\n}\nfunction renderDays() {\nvar box = $('days'); box.innerHTML = '';\n(state.cfg.days || []).forEach(function (d) {\nvar dt = new Date(d.date + 'T12:00:00');\nvar loc = lang === 'ar' ? 'ar-u-nu-latn' : 'en-GB';\nvar el = document.createElement('div');\nel.className = 'day' + (d.open ? '' : ' off') + (state.date === d.date ? ' sel' : '');\nel.innerHTML = '<small>' + dt.toLocaleDateString(loc, { weekday: 'short' }) + '</small><b>' + d.day + '</b><small>' + dt.toLocaleDateString(loc, { month: 'short' }) + '</small>';\nif (d.open) el.onclick = function () { state.date = d.date; state.time = ''; renderDays(); loadSlots(); canBook(); };\nbox.appendChild(el);\n});\n}\nfunction markSlots() { Array.prototype.forEach.call($('slots').querySelectorAll('.slot'), function (c) { c.className = 'slot' + (c.getAttribute('data-time') === state.time ? ' sel' : ''); }); }\nfunction loadSlots() {\nvar box = $('slots'); box.innerHTML = '';\nif (!state.service || !state.date) { $('slotsInfo').textContent = t('pickFirst'); return; }\n$('slotsInfo').textContent = t('checking');\nget({ action: 'slots', date: state.date, service: state.service }).then(function (res) {\nvar slots = (res && res.slots) || [];\n$('slotsInfo').textContent = slots.length ? t('free') : t('none');\nvar groups = {};\nslots.forEach(function (s) { var h = Number(String(s.time).split(':')[0]); var g = h < 12 ? 'morning' : (h < 17 ? 'afternoon' : 'evening'); (groups[g] = groups[g] || []).push(s); });\n['morning', 'afternoon', 'evening'].forEach(function (g) {\nif (!groups[g]) return;\nvar head = document.createElement('div'); head.className = 'period'; head.textContent = t(g); box.appendChild(head);\ngroups[g].forEach(function (s) {\nvar el = document.createElement('button'); el.type = 'button';\nel.className = 'slot'; el.textContent = s.time; el.setAttribute('data-time', s.time); el.title = s.dentist; el.dir = 'ltr';\nel.onclick = function () { state.time = s.time; state.dentist = s.dentist; markSlots(); canBook(); };\nbox.appendChild(el);\n});\n});\nmarkSlots();\n}).catch(function () { $('slotsInfo').textContent = t('loadErr'); });\n}\n['name', 'phone', 'consent'].forEach(function (id) { $(id).addEventListener('input', canBook); $(id).addEventListener('change', canBook); });\n$('langBtn').onclick = function () { lang = lang === 'ar' ? 'en' : 'ar'; try { localStorage.setItem('noor_lang', lang); } catch (e) {} applyLang(); if (state.service && state.date) loadSlots(); };\n$('service').onchange = function () { state.service = this.value; state.time = ''; showPrice(); loadSlots(); canBook(); };\n$('book').onclick = function () {\nvar email = $('email').value.trim();\nif (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(email)) { $('err').textContent = t('badEmail'); return; }\n$('err').textContent = ''; $('book').disabled = true; $('book').textContent = t('booking');\nvar body = new URLSearchParams({ name: $('name').value.trim(), phone: $('phone').value, email: email, offers: $('offers').checked ? 'yes' : 'no', language: lang, service: state.service, date: state.date, time: state.time, dentist: state.dentist, consent: $('consent').checked ? 'yes' : 'no', website: $('website').value });\nfetch(API, { method: 'POST', body: body }).then(function (r) { return r.json(); }).then(function (res) {\nif (res && res.ok) {\n$('flow').style.display = 'none'; $('sumBox').style.display = 'none'; $('ok').style.display = 'block';\n$('okText').textContent = res.summary || res.message || '';\n$('waLink').href = 'https://wa.me/' + (state.cfg.whatsapp || '') + '?text=' + encodeURIComponent(t('waText') + (res.summary || ''));\nwindow.scrollTo(0, 0);\n} else {\n$('err').textContent = (res && res.message) || t('fail');\n$('book').textContent = t('book'); state.time = ''; loadSlots(); canBook();\n}\n}).catch(function () { $('err').textContent = t('net'); $('book').textContent = t('book'); canBook(); });\n};\napplyLang();\nget({ action: 'config' }).then(function (cfg) { state.cfg = cfg; applyLang(); }).catch(function () { $('addr').textContent = t('closed'); });\n})();\n</script>\n</body>\n</html>\n"
+      }
+    },
+    {
+      "id": "fbc8a6a0-8fbb-4b40-8508-ecf4d9fd492e",
+      "name": "Booking API",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "options": {
+          "allowedOrigins": "*"
+        },
+        "path": "your-webhook-path",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "e5ffe7d3-75f9-45ac-b040-1a641d5426b9",
+      "name": "Get Setup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "162847ba-89b1-4610-b9c8-7dd38f47c1ce",
+      "name": "Handle Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Online booking API (GET): action=config gives the page its clinic info, services and days; action=slots asks the Booking Engine for free times.\n// Switches: online_booking (OFF closes the page) and email_capture (shows the email field).\nconst q = ($('Booking API').first().json || {}).query || {};\nconst Z = 'Asia/Dubai';\nconst sw = {};\n$('Booking Switch').all().forEach(function (i) { const r = i.json || {}; if (r.feature) sw[String(r.feature).trim()] = String(r.enabled).trim().toUpperCase() === 'TRUE'; });\nconst bookingOn = sw.online_booking !== false;\nconst emailOn = sw.email_capture !== false;\nconst rows = $('Get Setup').all().map(function (i) { return i.json || {}; }).filter(function (r) { return r.tab; })\n  .sort(function (a, b) { return Number(a.sort || 0) - Number(b.sort || 0); });\nconst c = {};\nrows.filter(function (r) { return r.tab === 'clinic'; }).forEach(function (r) { c[r.name] = String(r.value || '').trim(); });\nconst wa = String(c.clinic_whatsapp || '000000000000').replace(/\\D/g, '');\nif (!bookingOn) return [{ json: { kind: String(q.action || '') === 'slots' ? 'bad' : 'config', body: { clinic: c.clinic_name || 'BrightSmile Dental', address: c.address || '', currency: c.currency || 'AED', whatsapp: wa, services: [], days: [], slots: [], closed: true } } }];\nlet services = rows.filter(function (r) { return r.tab === 'price' && r.value !== '' && !isNaN(Number(r.value)) && !/emergency|طوارئ/i.test(r.name + ' ' + r.words); })\n  .map(function (r) { return { name: String(r.name), price: Number(r.value), from: /^y/i.test(String(r.option || '')), minutes: Number(r.minutes) || 0 }; });\nif (!services.length) services = [{ name: 'Consultation and check-up', price: 150, from: false, minutes: 30 }, { name: 'Cleaning (scale and polish)', price: 350, from: false, minutes: 30 }, { name: 'In-clinic teeth whitening', price: 1200, from: false, minutes: 90 }];\n\nif (String(q.action || '') === 'slots') {\n  const date = String(q.date || '');\n  const service = String(q.service || '').slice(0, 80);\n  const okService = services.some(function (s) { return s.name === service; });\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !okService) return [{ json: { kind: 'bad', body: { slots: [], error: 'Invalid date or service.' } } }];\n  return [{ json: { kind: 'slots', req: { action: 'find_slots', phone: 'web', date: date, days: 1, service: service, source: 'web' } } }];\n}\n\n// config: next 14 days with open/closed from the Clinic Setup hours and holidays\nconst DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];\nconst closed = String(c.closed_dates || '').split(/[,;\\s]+/).filter(function (x) { return /^\\d{4}-\\d{2}-\\d{2}$/.test(x); });\nconst today = DateTime.now().setZone(Z).startOf('day');\nconst ahead = Math.min(Number(c.max_days_ahead) || 60, 21);\nconst days = [];\nfor (let i = 0; i < Math.min(14, ahead); i++) {\n  const d = today.plus({ days: i });\n  const ymd = d.toFormat('yyyy-MM-dd');\n  const h = String(c['hours_' + DAYS[d.weekday - 1]] || '').trim();\n  const open = closed.indexOf(ymd) < 0 && !/closed/i.test(h);\n  days.push({ date: ymd, dow: d.toFormat('ccc'), day: d.toFormat('d'), mon: d.toFormat('LLL'), open: open });\n}\nreturn [{ json: { kind: 'config', body: {\n  clinic: c.clinic_name || 'BrightSmile Dental', address: c.address || 'Jumeirah, Dubai', currency: c.currency || 'AED',\n  whatsapp: wa, timezone_label: 'Dubai time', email_capture: emailOn, services: services, days: days\n} } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "546b767e-4efa-41c1-a267-3c596ab9b9f3",
+      "name": "Wants Slots?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.kind === 'slots' }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "9d764bb2-a771-463e-a5b6-7dd07e5e49df",
+      "name": "Find Slots",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "date",
+              "id": "date",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "days",
+              "id": "days",
+              "required": false,
+              "type": "number"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "source",
+              "id": "source",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "={{ $json.req.action }}",
+            "date": "={{ $json.req.date }}",
+            "days": "={{ $json.req.days }}",
+            "phone": "={{ $json.req.phone }}",
+            "service": "={{ $json.req.service }}",
+            "source": "={{ $json.req.source }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "19b779d8-2ce5-43ab-9115-249e9d0d3125",
+      "name": "Send Slots",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        200
+      ],
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ slots: ($json.slots || []).map(s => ({ time: s.time, dentist: s.dentist })) }) }}"
+      }
+    },
+    {
+      "id": "d8f2ddce-6db6-4216-b40b-6e33434b5ada",
+      "name": "Send Config",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        400
+      ],
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}"
+      }
+    },
+    {
+      "id": "f8127d28-d9cf-4515-bb18-453be1c2d89e",
+      "name": "Booking Submit",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "options": {
+          "allowedOrigins": "*"
+        },
+        "path": "your-webhook-path",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "0173e536-5443-4127-8c8e-f3b9d58608d1",
+      "name": "Get Setup (Book)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        700
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "tab",
+              "keyValue": "clinic"
+            },
+            {
+              "condition": "eq",
+              "keyName": "tab",
+              "keyValue": "price"
+            }
+          ]
+        },
+        "matchType": "anyCondition",
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "20cf146d-bdc1-479f-b1ef-256254d83b51",
+      "name": "Check Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        700
+      ],
+      "parameters": {
+        "jsCode": "// Validates an online booking before it goes to the Booking Engine. Switches: online_booking, email_capture.\nconst sw = {};\n$('Booking Switch (Book)').all().forEach(function (i) { const r = i.json || {}; if (r.feature) sw[String(r.feature).trim()] = String(r.enabled).trim().toUpperCase() === 'TRUE'; });\nconst raw = ($('Booking Submit').first().json || {}).body || {};\nlet b = raw;\nif (typeof raw === 'string') { b = {}; String(raw).split('&').forEach(function (kv) { const p = kv.split('='); if (p[0]) b[decodeURIComponent(p[0])] = decodeURIComponent((p[1] || '').replace(/\\+/g, ' ')); }); }\nconst lang = String(b.language || '') === 'ar' ? 'ar' : 'en';\nconst M = {\n  closed: { en: 'Online booking is closed at the moment. Please message us on WhatsApp.', ar: 'الحجز أونلاين مقفول دلوقتي، راسلنا على واتساب.' },\n  oops: { en: 'Sorry, something went wrong.', ar: 'عذراً، حصلت مشكلة.' },\n  name: { en: 'Please enter your full name.', ar: 'من فضلك اكتب اسمك بالكامل.' },\n  phone: { en: 'Please enter your WhatsApp number with the country code, e.g. +971 50 123 4567.', ar: 'من فضلك اكتب رقم الواتساب مع كود الدولة، مثلاً ‎+971 50 123 4567.' },\n  pick: { en: 'Please choose a service, a day and a time.', ar: 'من فضلك اختار الخدمة واليوم والوقت.' },\n  consent: { en: 'Please tick the box so the clinic can contact you about your appointment.', ar: 'من فضلك علّم على خانة الموافقة عشان العيادة تقدر تتواصل معاك بخصوص الموعد.' },\n  email: { en: 'Please check your email address.', ar: 'من فضلك راجع الإيميل.' }\n};\nconst bad = function (k) { return [{ json: { valid: false, body: { ok: false, message: M[k][lang] } } }]; };\nif (sw.online_booking === false) return bad('closed');\nconst c = {};\n$('Get Setup (Book)').all().forEach(function (i) { const r = i.json || {}; if (r.tab === 'clinic') c[r.name] = String(r.value || '').trim(); });\nif (String(b.website || '').trim()) return bad('oops'); // bots fill the hidden field\nconst name = String(b.name || '').replace(/\\s+/g, ' ').trim().slice(0, 80);\nlet phone = String(b.phone || '').replace(/\\D/g, '');\nif (phone.startsWith('00')) phone = phone.slice(2);\nif (/^0\\d{9}$/.test(phone)) phone = '971' + phone.slice(1); // UAE local 05x... number\nconst date = String(b.date || '');\nconst time = String(b.time || '');\nconst service = String(b.service || '').slice(0, 80);\nconst email = sw.email_capture === false ? '' : String(b.email || '').trim().toLowerCase().slice(0, 120);\nif (name.length < 2) return bad('name');\nif (phone.length < 8 || phone.length > 15) return bad('phone');\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !/^\\d{2}:\\d{2}$/.test(time) || !service) return bad('pick');\nif (String(b.consent || '') !== 'yes') return bad('consent');\nif (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(email)) return bad('email');\nconst ownerDigits = String(c.owner_phone || '').replace(/\\D/g, '');\nreturn [{ json: { valid: true, owner: ownerDigits.length >= 8 ? ownerDigits : '000000000000', lang: lang,\n  marketing: email ? { time: DateTime.now().setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm'), name: name, phone: phone, email: email, offers_optin: String(b.offers || '') === 'yes' ? 'yes' : 'no', language: lang, source: 'booking page', service: service } : null,\n  req: { action: 'book', phone: phone, start: date + ' ' + time, service: service, dentist: String(b.dentist || '').slice(0, 60), name: name, language: lang, new_or_returning: 'new', insurance: 'unknown', source: 'web' } } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "31ae1087-fd06-4ada-8914-53994fc6ddb0",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid === true }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "a804c1f3-5dca-4026-9d78-2b9316adefd2",
+      "name": "Book It",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        600
+      ],
+      "parameters": {
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "start",
+              "id": "start",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "dentist",
+              "id": "dentist",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "name",
+              "id": "name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "language",
+              "id": "language",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "new_or_returning",
+              "id": "new_or_returning",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "insurance",
+              "id": "insurance",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "source",
+              "id": "source",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "={{ $json.req.action }}",
+            "dentist": "={{ $json.req.dentist }}",
+            "insurance": "={{ $json.req.insurance }}",
+            "language": "={{ $json.req.language }}",
+            "name": "={{ $json.req.name }}",
+            "new_or_returning": "={{ $json.req.new_or_returning }}",
+            "phone": "={{ $json.req.phone }}",
+            "service": "={{ $json.req.service }}",
+            "source": "={{ $json.req.source }}",
+            "start": "={{ $json.req.start }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "f9dfc97a-a614-4894-9161-a24683f752a2",
+      "name": "Booking Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        600
+      ],
+      "parameters": {
+        "jsCode": "// Turns the Booking Engine answer into a short message for the page (English or Arabic) and the owner alert.\nconst r = $input.first().json || {};\nconst chk = $('Check Service').first().json;\nconst req = chk.req;\nconst ar = chk.lang === 'ar';\nconst msg = String(r.response || '');\nconst ok = r.ok === true && /^Booked/.test(msg);\nconst d = DateTime.fromFormat(req.start, 'yyyy-MM-dd HH:mm', { zone: 'Asia/Dubai' });\nconst when = d.isValid ? (ar ? d.setLocale('ar').reconfigure({ numberingSystem: 'latn' }).toFormat('cccc d LLLL') + ' الساعة ' + d.toFormat('h:mm') + (d.hour < 12 ? ' صباحاً' : ' مساءً') : d.toFormat('cccc d LLLL') + ' at ' + d.toFormat('h:mm a')) : req.start;\nconst dm = msg.match(/with (Dr\\.[^.]*?) at /);\nconst dentist = dm ? dm[1] : req.dentist;\nlet friendly = ar ? 'عذراً، هذا الوقت غير متاح للحجز. اختر وقتاً آخر.' : 'Sorry, that time could not be booked. Please pick another time.';\nif (/already has a booking/i.test(msg)) friendly = ar ? 'لديك موعد محجوز معنا بالفعل. راسلنا على واتساب لتغييره أو للحجز لأحد أفراد العائلة.' : 'You already have an appointment with us. Please message us on WhatsApp to change it or to book for a family member.';\nelse if (/no longer free/i.test(msg)) friendly = ar ? 'عذراً، هذا الوقت حُجز للتو. اختر وقتاً آخر.' : 'Sorry, that time was just taken. Please pick another time.';\nelse if (/closed|outside opening hours|too soon|days ahead|start every/i.test(msg)) friendly = ar ? 'هذا الوقت غير متاح. اختر وقتاً من المواعيد الظاهرة.' : msg.split(' Use find_free_slots')[0];\nconst summaryEn = req.service + ' for ' + req.name + ', ' + (d.isValid ? d.toFormat('cccc d LLLL') + ' at ' + d.toFormat('h:mm a') : req.start) + (dentist ? ' with ' + dentist : '') + '.';\nconst summary = ar ? req.service + ' لـ ' + req.name + '، ' + when + (dentist ? ' مع ' + dentist : '') + '.' : summaryEn;\nreturn [{ json: { ok: ok, summary: ok ? summary : '', message: ok ? (ar ? 'تم الحجز: ' : 'Booked: ') + summary : friendly,\n  save_email: ok && !!chk.marketing, marketing: chk.marketing,\n  alert: '[Noor] New online booking: ' + req.name + ' (+' + req.phone + '), ' + summaryEn + (chk.marketing ? ' Email: ' + chk.marketing.email + (chk.marketing.offers_optin === 'yes' ? ' (wants offers)' : '') + '.' : '') + ' Booked from the website.' } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "1a865d8e-26d3-416d-a64d-d62a08a06ad7",
+      "name": "Booked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok === true }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "60bd2909-6765-4b26-945b-dd588496eb38",
+      "name": "Alert Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        520
+      ],
+      "parameters": {
+        "messageType": "text",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ /^000000000000/.test(String($('Check Service').first().json.req.phone || '')) ? 'test-number-no-alert' : $('Check Booking').first().json.owner }}",
+        "resource": "message",
+        "textBody": "={{ String($('Booking Result').first().json.alert || '').replace(' Booked from the website.', String((($('Booking Submit').first().json || {}).body || {}).channel || '') === 'phone' ? ' Booked by phone (Noor phone receptionist).' : ' Booked from the website.') }}"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "764b5274-c13c-4322-b0c4-a83a70681e51",
+      "name": "Send Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1920,
+        600
+      ],
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: $('Booking Result').first().json.ok, summary: $('Booking Result').first().json.summary, message: $('Booking Result').first().json.message }) }}"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "9e0ae476-5919-4846-97aa-0cd96225d0bc",
+      "name": "Send Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        800
+      ],
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}"
+      }
+    },
+    {
+      "id": "9412fedf-6c89-4307-b282-613e1a46fd9c",
+      "name": "Booking Switch",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        120,
+        420
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "feature",
+              "keyValue": "online_booking"
+            },
+            {
+              "condition": "eq",
+              "keyName": "feature",
+              "keyValue": "email_capture"
+            }
+          ]
+        },
+        "limit": 5,
+        "matchType": "anyCondition",
+        "operation": "get",
+        "resource": "row",
+        "returnAll": false
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "eaa4b119-301c-4d55-8b69-6468db6865cb",
+      "name": "Booking Switch (Book)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        120,
+        820
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "feature",
+              "keyValue": "online_booking"
+            },
+            {
+              "condition": "eq",
+              "keyName": "feature",
+              "keyValue": "email_capture"
+            }
+          ]
+        },
+        "limit": 5,
+        "matchType": "anyCondition",
+        "operation": "get",
+        "resource": "row",
+        "returnAll": false
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "a6855fd1-bd51-4479-8fd3-f763941f9633",
+      "name": "Save Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1800,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Booking Result').first().json.save_email === true }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "dacbed59-6e58-42d7-99ef-890a58cfb91f",
+      "name": "Marketing Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        620
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: $('Booking Result').first().json.marketing }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "ba55b794-d5ec-41a8-8152-6a6cd6d7a765",
+      "name": "Add To Marketing List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2240,
+        620
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "schema": [],
+          "value": {}
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "append",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "c0a320b1-f8ae-4681-966b-1cfc46bcb1c1",
+      "name": "Check Service",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        900
+      ],
+      "parameters": {
+        "jsCode": "// Audit 17 Nov 2026: only book services the clinic really offers. Matches loosely (e.g. \"cleaning\" -> \"Cleaning (scale and polish)\") so the phone agent still works; unknown services are refused.\n// Also completes UAE numbers said without the country code (5x xxx xxxx -> 9715x xxx xxxx).\nconst it = $input.first().json;\nif (!it.valid) return [{ json: it }];\nconst fixPhone = function (p) { let d = String(p || '').replace(/\\D/g, ''); if (d.startsWith('00')) d = d.slice(2); if (/^0?5\\d{8}$/.test(d)) d = '971' + d.replace(/^0/, ''); return d; };\nconst rows = $('Get Setup (Book)').all().map(function (i) { return i.json || {}; }).filter(function (r) { return r.tab === 'price' && r.name; });\nconst out = JSON.parse(JSON.stringify(it));\nout.req.phone = fixPhone(out.req.phone);\nif (out.marketing) out.marketing.phone = out.req.phone;\nif (!rows.length) return [{ json: out }];\nconst norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9؀-ۿ ]/g, ' ').replace(/\\s+/g, ' ').trim(); };\nconst want = norm(it.req.service);\nlet hit = rows.find(function (r) { return norm(r.name) === want; });\nif (!hit) hit = rows.find(function (r) { const n = norm(r.name); return want.length > 3 && (n.indexOf(want) >= 0 || want.indexOf(n) >= 0); });\nif (!hit) hit = rows.find(function (r) { return String(r.words || '').toLowerCase().split(',').map(function (w) { return w.trim(); }).filter(function (w) { return w.length > 2; }).some(function (w) { return want.indexOf(w) >= 0; }); });\nif (!hit) {\n  const ar = it.lang === 'ar';\n  return [{ json: { valid: false, body: { ok: false, message: ar ? 'هذه الخدمة غير متوفرة لدينا. اختر خدمة من القائمة.' : 'We do not offer that service. Please choose one from the list.', services: rows.map(function (r) { return r.name; }) } } }];\n}\nout.req.service = String(hit.name);\nif (out.marketing) out.marketing.service = String(hit.name);\nreturn [{ json: out }];\n"
+      }
+    },
+    {
+      "id": "76df8e43-8b0c-4edb-a74b-8d04d438c7cb",
+      "name": "Phone Confirm?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        820
+      ],
+      "parameters": {
+        "jsCode": "// Bookings made on a phone call: send the caller a WhatsApp confirmation (approved appointment_reminder template).\nlet b = ($('Booking Submit').first().json || {}).body || {};\nif (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { b = {}; } }\nif (String(b.channel || '') !== 'phone') return [];\nconst req = $('Check Service').first().json.req;\nif (!req || /^000000000000/.test(String(req.phone || ''))) return [];\nconst ar = String(req.language || b.language || '').toLowerCase().startsWith('ar');\nconst d = DateTime.fromFormat(req.start, 'yyyy-MM-dd HH:mm', { zone: 'Asia/Dubai' });\nif (!d.isValid) return [];\nconst date = d.reconfigure({ locale: ar ? 'ar' : 'en', numberingSystem: 'latn' }).toFormat('cccc d LLLL');\nconst time = ar ? d.toFormat('h:mm') + (d.hour < 12 ? ' صباحاً' : ' مساءً') : d.toFormat('h:mm a');\nconst first = String(req.name || '').trim().split(' ')[0] || (ar ? 'عزيزنا' : 'there');\nreturn [{ json: { phone: req.phone, template: 'appointment_reminder|' + (ar ? 'ar' : 'en'), p1: first, p2: req.service, p3: date, p4: time } }];\n"
+      }
+    },
+    {
+      "id": "403bf215-ddf3-477b-9932-ed5ace08b835",
+      "name": "WhatsApp Caller",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        820
+      ],
+      "parameters": {
+        "components": {
+          "component": [
+            {
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "text": "={{ $json.p1 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p2 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p3 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p4 }}",
+                    "type": "text"
+                  }
+                ]
+              },
+              "type": "body"
+            }
+          ]
+        },
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "resource": "message",
+        "template": "={{ $json.template }}"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    }
+  ],
+  "connections": {
+    "Booking Page": {
+      "main": [
+        [
+          {
+            "node": "Send Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Setup": {
+      "main": [
+        [
+          {
+            "node": "Handle Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Request": {
+      "main": [
+        [
+          {
+            "node": "Wants Slots?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wants Slots?": {
+      "main": [
+        [
+          {
+            "node": "Find Slots",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Slots": {
+      "main": [
+        [
+          {
+            "node": "Send Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Setup (Book)": {
+      "main": [
+        [
+          {
+            "node": "Check Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Book It",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book It": {
+      "main": [
+        [
+          {
+            "node": "Booking Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Result": {
+      "main": [
+        [
+          {
+            "node": "Booked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booked?": {
+      "main": [
+        [
+          {
+            "node": "Alert Owner",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Phone Confirm?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking API": {
+      "main": [
+        [
+          {
+            "node": "Booking Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Switch": {
+      "main": [
+        [
+          {
+            "node": "Get Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Submit": {
+      "main": [
+        [
+          {
+            "node": "Booking Switch (Book)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Switch (Book)": {
+      "main": [
+        [
+          {
+            "node": "Get Setup (Book)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Owner": {
+      "main": [
+        [
+          {
+            "node": "Save Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Email?": {
+      "main": [
+        [
+          {
+            "node": "Marketing Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marketing Row": {
+      "main": [
+        [
+          {
+            "node": "Add To Marketing List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add To Marketing List": {
+      "main": [
+        [
+          {
+            "node": "Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Booking": {
+      "main": [
+        [
+          {
+            "node": "Check Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Service": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phone Confirm?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

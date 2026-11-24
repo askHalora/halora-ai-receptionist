@@ -1,0 +1,3779 @@
+{
+  "name": "Noor – Main v2",
+  "nodes": [
+    {
+      "id": "ee973a91-9d63-42c8-b26c-61f5e025dc36",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        448
+      ],
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {
+          "messageStatusUpdates": [
+            "failed"
+          ]
+        }
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "81cf3123-54d4-4eab-b52d-d8847fe9fdf4",
+      "name": "Only Patient Messages",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        224,
+        448
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.messages?.[0]?.from }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      }
+    },
+    {
+      "id": "9c8d389b-d08a-4cdf-8d08-7c7a66114b62",
+      "name": "Message Info",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        448
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "phone",
+              "name": "phone",
+              "type": "string",
+              "value": "={{ $('Only Patient Messages').first().json.messages[0].from }}"
+            },
+            {
+              "id": "type",
+              "name": "type",
+              "type": "string",
+              "value": "={{ $('Only Patient Messages').first().json.messages[0].type }}"
+            },
+            {
+              "id": "text",
+              "name": "text",
+              "type": "string",
+              "value": "={{ (() => { const m = $('Only Patient Messages').first().json.messages[0]; const ir = m.interactive?.button_reply ?? m.interactive?.list_reply; if (ir) { const id = String(ir.id || ''); return id.startsWith('opt:') && id !== 'opt:other' ? id.slice(4) : String(ir.title ?? ''); } if (m.button && m.button.text) return '[The patient tapped the \"' + m.button.text + '\" button on your latest automatic message (reminder, follow-up or offer). Act on it: Confirm = confirm their booking; Reschedule / Book now = offer free times; Not now = thank them politely.] ' + m.button.text; return m.text?.body ?? m.image?.caption ?? m.document?.caption ?? ''; })() }}"
+            },
+            {
+              "id": "profile_name",
+              "name": "profile_name",
+              "type": "string",
+              "value": "={{ $('Only Patient Messages').first().json.contacts?.[0]?.profile?.name ?? '' }}"
+            },
+            {
+              "id": "media_id",
+              "name": "media_id",
+              "type": "string",
+              "value": "={{ (() => { const m = $('Only Patient Messages').first().json.messages[0]; return m.image?.id ?? m.audio?.id ?? m.document?.id ?? ''; })() }}"
+            },
+            {
+              "id": "owner_phone",
+              "name": "owner_phone",
+              "type": "string",
+              "value": "={{ (() => { try { const on = $('Get Setup Switch').all().some(i => i.json && i.json.feature === 'clinic_setup' && String(i.json.enabled).trim().toUpperCase() === 'TRUE'); const r = $('Get Setup').all().map(i => i.json || {}).find(x => x.tab === 'clinic' && x.name === 'owner_phone'); const p = r ? String(r.value).replace(/\\D/g, '') : ''; return on && p.length >= 8 ? p : '000000000000'; } catch (e) { return '000000000000'; } })() }}"
+            },
+            {
+              "id": "is_owner_command",
+              "name": "is_owner_command",
+              "type": "boolean",
+              "value": "={{ (() => { let owner = '000000000000'; try { const on = $('Get Setup Switch').all().some(i => i.json && i.json.feature === 'clinic_setup' && String(i.json.enabled).trim().toUpperCase() === 'TRUE'); const r = $('Get Setup').all().map(i => i.json || {}).find(x => x.tab === 'clinic' && x.name === 'owner_phone'); const p = r ? String(r.value).replace(/\\D/g, '') : ''; if (on && p.length >= 8) owner = p; } catch (e) {} const m = $('Only Patient Messages').first().json.messages[0]; return m.from === owner && String(m.text?.body ?? '').trim().startsWith('#'); })() }}"
+            }
+          ]
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "9f652050-ea10-4ea7-bca2-ea74b6cf56d4",
+      "name": "Log Incoming",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        448
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}",
+            "phone": "={{ $json.phone }}",
+            "direction": "in",
+            "type": "={{ $json.type }}",
+            "text": "={{ $json.text || ('[' + $json.type + ']') }}"
+          },
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "594f0e1c-27c7-42f3-8992-dede873ce835",
+      "name": "Lookup Patient",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        448
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $('Message Info').first().json.phone }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "932378ec-75a6-4a9d-a069-4abc39b094a4",
+      "name": "Route Message",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        400
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "renameOutput": true,
+              "outputKey": "owner",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Message Info').first().json.is_owner_command }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "voice",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Message Info').first().json.type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "audio"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "photo",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Message Info').first().json.type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "image"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "document",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Message Info').first().json.type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "document"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "text"
+        }
+      }
+    },
+    {
+      "id": "7c8123a7-08e5-4f10-8d41-eef068b16487",
+      "name": "Send Owner Reply",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2288,
+        112
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.owner_phone }}",
+        "messageType": "text",
+        "textBody": "={{ $json.reply }}"
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "3b85ae21-bdf0-4964-b68c-77b44feaad7e",
+      "name": "Get Voice File",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2288,
+        352
+      ],
+      "parameters": {
+        "resource": "media",
+        "operation": "mediaUrlGet",
+        "mediaGetId": "={{ $('Message Info').first().json.media_id }}"
+      },
+      "webhookId": "REPLACE_ME",
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "610caf82-d908-4fc2-a98a-b1ef7c15eef6",
+      "name": "Download Voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2512,
+        352
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "dfa0674e-9345-48d9-a6dd-39778759bc8c",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        4288,
+        464
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.phone }}",
+        "messageType": "text",
+        "textBody": "={{ $('Ask Noor').first().json.reply }}"
+      },
+      "webhookId": "REPLACE_ME",
+      "executeOnce": true
+    },
+    {
+      "id": "2a241b09-2134-4f06-bfa2-db920813496e",
+      "name": "Log Reply",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        4512,
+        464
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}",
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "direction": "out",
+            "type": "text",
+            "text": "={{ $('Ask Noor').first().json.reply }}"
+          },
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6b47f802-b4e9-486f-ab94-debdb60b80b7",
+      "name": "Get Photo File",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1600,
+        544
+      ],
+      "parameters": {
+        "resource": "media",
+        "operation": "mediaUrlGet",
+        "mediaGetId": "={{ $('Message Info').first().json.media_id }}"
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "edbf42e6-63f8-4879-a449-d220b680f336",
+      "name": "Download Photo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2064,
+        544
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "180ac827-b347-4876-84ad-3f111a679394",
+      "name": "Read Card",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        2288,
+        544
+      ],
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-haiku-4-5-20251001",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "inputType": "binary",
+        "binaryPropertyName": "data",
+        "simplify": true,
+        "options": {
+          "maxTokens": 400
+        },
+        "text": "Look at this image. If it is a health insurance card, return ONLY this JSON: {\"is_insurance_card\": true, \"insurer\": \"\", \"plan\": \"\", \"member_name\": \"\", \"member_id\": \"\", \"expiry\": \"YYYY-MM-DD or empty\", \"description\": \"one short sentence\"}. Copy exactly what is printed and never guess; leave a field empty if you cannot read it. If it is not an insurance card, return ONLY {\"is_insurance_card\": false, \"description\": \"one short sentence describing the image\"}."
+      }
+    },
+    {
+      "id": "90c5873b-0676-4c97-9f90-0e25aae39a99",
+      "name": "Parse Card",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        544
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const raw = $json.content?.[0]?.text ?? $json.text ?? $json.output ?? JSON.stringify($json);\nlet card = {};\ntry { card = JSON.parse(String(raw).match(/\\{[\\s\\S]*\\}/)[0]); } catch (e) { card = { is_insurance_card: false, description: 'an image Noor could not read' }; }\nconst patient = $('Lookup Patient').first().json || {};\nconst lang = String(patient.language || '').startsWith('ar') ? 'ar' : 'en';\nconst firstName = String(patient.name || $('Message Info').first().json.profile_name || '').split(' ')[0];\nconst today = DateTime.now().setZone('Asia/Dubai').toFormat('yyyy-MM-dd');\nconst expiry = /^\\d{4}-\\d{2}-\\d{2}$/.test(String(card.expiry || '')) ? card.expiry : '';\nconst expired = !!expiry && expiry < today;\nconst id = String(card.member_id || '');\nconst last4 = id.length > 4 ? id.slice(-4) : id;\nconst insurer = String(card.insurer || 'insurance');\nlet reply;\nif (lang === 'ar') {\n  reply = expired\n    ? 'شكراً ' + firstName + '! قرأت بطاقة ' + insurer + '، لكن يبدو أنها انتهت بتاريخ ' + expiry + '. يرجى إرسال بطاقة سارية، أو سيساعدك فريقنا.'\n    : 'شكراً ' + firstName + '! استلمنا بطاقة تأمين ' + insurer + (last4 ? ' (رقم العضوية ينتهي بـ ' + last4 + ')' : '') + '. سيتأكد فريقنا من التغطية قبل موعدك.';\n} else {\n  reply = expired\n    ? 'Thanks ' + firstName + '! I read your ' + insurer + ' card, but it looks like it expired on ' + expiry + '. Please send a valid card, or our team will help you.'\n    : 'Thanks ' + firstName + '! We received your ' + insurer + ' card' + (last4 ? ' (member ID ending ' + last4 + ')' : '') + '. Our team will confirm your coverage before your visit.';\n}\nreturn { json: {\n  is_card: card.is_insurance_card === true,\n  insurer: String(card.insurer || ''), plan: String(card.plan || ''), member_name: String(card.member_name || ''),\n  member_id: id, expiry, expired, description: String(card.description || ''),\n  reply,\n  staff_alert: '[Noor] Insurance card from +' + $('Message Info').first().json.phone + ': ' + insurer + ' ' + String(card.plan || '') + ', member ' + (card.member_name || '?') + ', ID ' + (id || '?') + ', expiry ' + (expiry || '?') + (expired ? ' - EXPIRED' : '') + '. Please verify coverage.'\n} };\n"
+      }
+    },
+    {
+      "id": "bf8f0a35-3a13-4135-a2e4-b392460bfac9",
+      "name": "Is It an Insurance Card?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2736,
+        544
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.is_card }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true
+      }
+    },
+    {
+      "id": "3be57e20-c77e-4ee4-bf51-84af5069e025",
+      "name": "Save Insurance Card",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3408,
+        768
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "insurer": "={{ $json.insurer }}",
+            "plan": "={{ $json.plan }}",
+            "member_name": "={{ $json.member_name }}",
+            "member_id": "={{ $json.member_id }}",
+            "expiry": "={{ $json.expiry }}{{ $json.expired ? ' (EXPIRED)' : '' }}",
+            "received_at": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "insurer",
+              "displayName": "insurer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "plan",
+              "displayName": "plan",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "member_name",
+              "displayName": "member_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "member_id",
+              "displayName": "member_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expiry",
+              "displayName": "expiry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "received_at",
+              "displayName": "received_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "e1df6792-530d-4af2-8608-16082f684104",
+      "name": "Mark Card Received",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        4064,
+        768
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "value": {
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "insurance": "yes",
+            "insurance_card_received": "={{ $('Parse Card').item.json.expired ? 'expired' : 'yes' }}",
+            "last_message_at": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "insurance",
+              "displayName": "insurance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "insurance_card_received",
+              "displayName": "insurance_card_received",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_message_at",
+              "displayName": "last_message_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "87f340b2-8c33-40e0-9217-8df627ac1a0f",
+      "name": "Reply About Card",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        4288,
+        768
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.phone }}",
+        "messageType": "text",
+        "textBody": "={{ $('Parse Card').item.json.reply }}"
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "17447440-541b-4e2c-962c-57e4f846dc5b",
+      "name": "Alert Staff: Card",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        4512,
+        768
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.owner_phone }}",
+        "messageType": "text",
+        "textBody": "={{ $('Parse Card').item.json.staff_alert }}"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "826f2c4e-f13e-4052-a3ab-1bd3c82deb6d",
+      "name": "Mark Document Received",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1600,
+        736
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "value": {
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "notes": "Sent a document on WhatsApp - staff to review",
+            "last_message_at": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_message_at",
+              "displayName": "last_message_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "efd429f1-1308-4bba-a882-849ea7b0b463",
+      "name": "Reply About Document",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2064,
+        736
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.phone }}",
+        "messageType": "text",
+        "textBody": "Thank you, we received your document. Our team will review it and get back to you.\n\nشكراً لك، استلمنا المستند وسيراجعه فريقنا ويتواصل معك."
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "bd348da3-3d21-465f-9e9f-9498e2e9296e",
+      "name": "Alert Staff: Document",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2288,
+        736
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.owner_phone }}",
+        "messageType": "text",
+        "textBody": "=[Noor] Patient +{{ $('Message Info').first().json.phone }} sent a document on WhatsApp. Please review it in the chat."
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "74555347-0f4e-4e18-be71-e01451da0aab",
+      "name": "Sorry Reply",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        992
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.phone }}",
+        "messageType": "text",
+        "textBody": "Sorry, I had a technical problem answering that. A team member will reply to you shortly.\n\nعذراً، حدثت مشكلة تقنية. سيتواصل معك أحد أعضاء الفريق قريباً."
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "130da6b0-00ba-4023-b69d-43fd36c379b1",
+      "name": "Alert Staff: Noor Failed",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        992
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.owner_phone }}",
+        "messageType": "text",
+        "textBody": "=[Noor] I could not answer +{{ $('Message Info').first().json.phone }} (\"{{ $('Message Info').first().json.text.slice(0, 120) }}\"). Please reply to them."
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "85d92e55-1b00-4e4f-8d97-0b65738d0340",
+      "name": "Transcribe Voice",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        2736,
+        352
+      ],
+      "parameters": {
+        "binaryPropertyName": "data",
+        "inputType": "binary",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-3.8-flash"
+        },
+        "operation": "analyze",
+        "options": {
+          "maxOutputTokens": 1000
+        },
+        "resource": "audio",
+        "simplify": true,
+        "text": "Transcribe this WhatsApp voice note word for word, in the exact language and dialect spoken. It can be English (any accent), Egyptian Arabic, Gulf Arabic, or a mix of English and Arabic. The speaker is a patient talking to a dental clinic, so expect words like: cleaning / تنظيف, whitening / تبييض, braces or aligners / تقويم, filling / حشو, root canal / علاج عصب, implant / زراعة, extraction / خلع, check-up / كشف, price / سعر / بكام, appointment / ميعاد / موعد, insurance / تأمين, names of days and times. Write English words in English letters and Arabic words in Arabic script, exactly as spoken. Write numbers as digits. Output ONLY the transcript: no translation, no summary, no comments. If there is no speech, output exactly: (empty)"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "8251f234-3393-478e-8f5e-2d2a3a0a9fd5",
+      "name": "Download Voice Again",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2960,
+        560
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "method": "GET",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "response": {
+            "response": {
+              "outputPropertyName": "data",
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 15000
+        },
+        "url": "={{ $('Download Voice').first().json.url }}"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "15b3e1ba-7cb9-4c90-826a-9c47f65a24a5",
+      "name": "Backup Transcribe",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        3184,
+        560
+      ],
+      "parameters": {
+        "binaryPropertyName": "data",
+        "inputType": "binary",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-3.5-flash"
+        },
+        "operation": "analyze",
+        "options": {
+          "maxOutputTokens": 1000
+        },
+        "resource": "audio",
+        "simplify": true,
+        "text": "Transcribe this WhatsApp voice note word for word, in the exact language and dialect spoken. It can be English (any accent), Egyptian Arabic, Gulf Arabic, or a mix of English and Arabic. The speaker is a patient talking to a dental clinic, so expect words like: cleaning / تنظيف, whitening / تبييض, braces or aligners / تقويم, filling / حشو, root canal / علاج عصب, implant / زراعة, extraction / خلع, check-up / كشف, price / سعر / بكام, appointment / ميعاد / موعد, insurance / تأمين, names of days and times. Write English words in English letters and Arabic words in Arabic script, exactly as spoken. Write numbers as digits. Output ONLY the transcript: no translation, no summary, no comments. If there is no speech, output exactly: (empty)"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "3d402df7-7b8a-4cc8-a6f7-ff111ad465d9",
+      "name": "Feature Flags",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -160
+      ],
+      "parameters": {
+        "jsCode": "// Switches (from the Noor Settings tab, synced to a data table) and whether staff paused this chat.\nconst on = {};\n$('Get Settings').all().forEach(function (i) { const r = i.json || {}; const k = String(r.feature || '').trim(); if (k) on[k] = String(r.enabled).trim().toUpperCase() === 'TRUE'; });\nconst last = ($('Get Takeover').all()[0] || {}).json || {};\nconst chatPaused = !!on.staff_takeover && String(last.paused || '').trim().toUpperCase() === 'TRUE';\nreturn [{ json: Object.assign({}, on, { typing_indicator: !!on.typing_indicator && !chatPaused, chat_paused: chatPaused }) }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "ae2b1419-0d46-4f84-ab30-38ef9ee1ceaa",
+      "name": "Typing On?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        -160
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.typing_indicator === true }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "64e25f10-8e94-4122-95b4-a13da2191b68",
+      "name": "Show Typing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1344,
+        -176
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: $('WhatsApp Trigger').first().json.messages[0].id, typing_indicator: { type: 'text' } }) }}",
+        "method": "POST",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "timeout": 5000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://graph.facebook.com/v22.0/YOUR_PHONE_NUMBER_ID/messages"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "5344e567-4dc7-4ee8-ab5a-a7c8a82d6363",
+      "name": "Takeover Check",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1008,
+        224
+      ],
+      "parameters": {
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "normal"
+        },
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Message Info').first().json.is_owner_command === true && /^#\\s*(pause|resume|reply)\\s+\\+?\\d{8,15}\\b/i.test(String($('Message Info').first().json.text || '').trim()) && $('Feature Flags').isExecuted && $('Feature Flags').first().json.staff_takeover === true }}",
+                    "operator": {
+                      "operation": "true",
+                      "singleValue": true,
+                      "type": "boolean"
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "staff command",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Message Info').first().json.is_owner_command !== true && $('Feature Flags').isExecuted && $('Feature Flags').first().json.chat_paused === true }}",
+                    "operator": {
+                      "operation": "true",
+                      "singleValue": true,
+                      "type": "boolean"
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "paused",
+              "renameOutput": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ed6d6949-fc95-481a-9e3d-15ded6cbd4d1",
+      "name": "Takeover Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        -16
+      ],
+      "parameters": {
+        "jsCode": "// Staff takeover (switch: staff_takeover). Owner commands: #pause <phone>, #resume <phone>, #reply <phone> <message>.\nconst info = $('Message Info').first().json;\nconst m = String(info.text || '').trim().match(/^#\\s*(pause|resume|reply)\\s+\\+?(\\d{8,15})\\b\\s*([\\s\\S]*)$/i);\nconst now = DateTime.now().setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm');\nif (!m) return [{ json: { time: now, phone: '', paused: '', action: 'invalid', by: 'owner', message: '', owner_text: 'Use #pause 9715XXXXXXXX, #reply 9715XXXXXXXX your message, or #resume 9715XXXXXXXX.' } }];\nconst cmd = m[1].toLowerCase();\nconst target = m[2];\nconst msg = String(m[3] || '').trim();\nlet ownerText = '';\nif (cmd === 'pause') ownerText = 'Noor is paused for +' + target + '. Their new messages will be forwarded to you here. Answer with #reply ' + target + ' your message, and hand back with #resume ' + target + '.';\nif (cmd === 'resume') ownerText = 'Noor is back on for +' + target + '.';\nif (cmd === 'reply' && msg) ownerText = 'Sent to +' + target + ': \"' + msg.slice(0, 200) + '\". Noor stays paused for this patient until you send #resume ' + target + '.';\nif (cmd === 'reply' && !msg) ownerText = 'Noor is paused for +' + target + ', but no message was sent. Write it after the number, e.g. #reply ' + target + ' Hello, this is Dr Sara from BrightSmile.';\nreturn [{ json: { time: now, phone: target, paused: cmd === 'resume' ? 'FALSE' : 'TRUE', action: cmd, by: 'owner', message: cmd === 'reply' ? msg : '', owner_text: ownerText } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "01bc2dfa-70ae-45f6-927f-8c18db6e5fbe",
+      "name": "Reply To Patient?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        -16
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ !$('Save Takeover').first().json.error && $('Takeover Command').first().json.action === 'reply' && $('Takeover Command').first().json.message !== '' }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "7131d206-62cf-4883-a59e-f913afb0d87a",
+      "name": "Send Staff Reply",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1904,
+        -112
+      ],
+      "parameters": {
+        "messageType": "text",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Takeover Command').first().json.phone }}",
+        "resource": "message",
+        "textBody": "={{ $('Takeover Command').first().json.message }}"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "aa192b37-5188-40dd-9fd3-d975e203a535",
+      "name": "Log Staff Reply",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2128,
+        -112
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "time",
+              "id": "time",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "direction",
+              "id": "direction",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "type",
+              "id": "type",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "text",
+              "id": "text",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "direction": "out",
+            "phone": "={{ $('Takeover Command').first().json.phone }}",
+            "text": "={{ '[staff] ' + $('Takeover Command').first().json.message }}",
+            "time": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}",
+            "type": "text"
+          }
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "append",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "bfce2fab-51ea-45e6-86b3-0785c37eeeb6",
+      "name": "Confirm To Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2352,
+        -16
+      ],
+      "parameters": {
+        "messageType": "text",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.phone }}",
+        "resource": "message",
+        "textBody": "={{ $('Save Takeover').first().json.error ? 'Sorry, Google Sheets was busy and this was not saved (nothing was sent to the patient). Please send the same command again in a minute.' : ($('Send Staff Reply').isExecuted && !($('Send Staff Reply').first().json.messages) ? 'Could not send to +' + $('Takeover Command').first().json.phone + ' (WhatsApp only allows free messages within 24 hours of the patient\\'s last message). Please call them instead. Noor stays paused until #resume.' : $('Takeover Command').first().json.owner_text) }}"
+      },
+      "onError": "continueRegularOutput",
+      "executeOnce": true,
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "8c3ad084-b667-476e-88de-340d99819fd8",
+      "name": "Forward To Staff",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1232,
+        224
+      ],
+      "parameters": {
+        "messageType": "text",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.owner_phone }}",
+        "resource": "message",
+        "textBody": "=[Noor paused] +{{ $('Message Info').first().json.phone }}{{ $('Message Info').first().json.profile_name ? ' (' + $('Message Info').first().json.profile_name + ')' : '' }}: {{ $('Message Info').first().json.text || ('(sent a ' + ($('Message Info').first().json.type === 'audio' ? 'voice note' : $('Message Info').first().json.type) + ')') }}\nAnswer: #reply {{ $('Message Info').first().json.phone }} your message\nHand back to Noor: #resume {{ $('Message Info').first().json.phone }}"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "95d16d5f-3ee5-406d-bdcd-f430887836ff",
+      "name": "Get Settings",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        -160
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "d2f82937-c5f3-41f1-bd88-89962e4c48fe",
+      "name": "Get Takeover",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        784,
+        -320
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "phone",
+              "keyValue": "={{ $('Message Info').first().json.phone }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allConditions",
+        "operation": "get",
+        "orderBy": true,
+        "orderByColumn": "createdAt",
+        "orderByDirection": "DESC",
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "6563685a-b961-417b-ab64-8fd004a96513",
+      "name": "Save Takeover",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1456,
+        -16
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "paused",
+              "id": "paused",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "message",
+              "id": "message",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "by",
+              "id": "by",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "={{ $json.action }}",
+            "by": "={{ $json.by }}",
+            "message": "={{ $json.message }}",
+            "paused": "={{ $json.paused }}",
+            "phone": "={{ $json.phone }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "25cd33dc-551c-41c5-bd10-b4d63f1a8759",
+      "name": "Ask Noor",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3344,
+        368
+      ],
+      "parameters": {
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Patient Brain",
+          "mode": "id",
+          "value": "bzMsSKoPaAskxlyN"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "profile_name",
+              "id": "profile_name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "type",
+              "id": "type",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "text",
+              "id": "text",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "patient",
+              "id": "patient",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "test_mode",
+              "id": "test_mode",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "patient": "={{ JSON.stringify($('Lookup Patient').first().json || {}) }}",
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "profile_name": "={{ $('Message Info').first().json.profile_name }}",
+            "test_mode": "",
+            "text": "={{ $('Message Info').first().json.type === 'audio' ? '[Voice note from the patient, transcribed word for word. Answer EXACTLY what they asked in it: every question, in the order asked, nothing unrelated. Reply in the language they spoke. If a word looks slightly misheard, use the dental meaning that fits. Only ask them to repeat if the transcript is (empty).] Transcript: ' + (() => { const pick = (n) => { try { return $(n).isExecuted ? $(n).first().json : null; } catch (e) { return null; } }; const sc = pick('Scribe Transcribe'); let t = sc && sc.text ? String(sc.text).trim() : ''; const f = pick('Fast Transcribe'); if (!t && f && Array.isArray(f.candidates) && f.candidates[0]) t = (((f.candidates[0].content || {}).parts) || []).filter((p) => p && p.text && !p.thought).map((p) => p.text).join(' ').trim(); if (!t) { const b = pick('Backup Transcribe') || pick('Transcribe Voice') || {}; t = String(b.text || (((b.content || {}).parts || [{}])[0] || {}).text || '').trim(); } return t || '(empty)'; })() : ($('Message Info').first().json.type === 'image' ? '[The patient sent a photo that is not an insurance card: ' + $('Parse Card').first().json.description + '] ' + $('Message Info').first().json.text : (() => { try { if ($('Group Messages').isExecuted) { const g = $('Group Messages').first().json; if (g && g.combined) return g.count > 1 ? '[The patient sent ' + g.count + ' messages in a row; answer them together in one reply]\\n' + g.combined : g.combined; } } catch (e) {} return $('Message Info').first().json.text; })()) }}",
+            "type": "={{ $('Message Info').first().json.type }}"
+          }
+        }
+      },
+      "onError": "continueErrorOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "59b4a275-917c-4f5d-b030-1344c7891ae3",
+      "name": "Ask Owner Mode",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1536,
+        112
+      ],
+      "parameters": {
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Owner Mode",
+          "mode": "id",
+          "value": "2DqybWrLFdzWeF3h"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "text",
+              "id": "text",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "text": "={{ $('Message Info').first().json.text }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "da9f7566-6653-4a82-bf11-1d000000000000",
+      "name": "Voice To Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2736,
+        192
+      ],
+      "parameters": {
+        "jsCode": "// Turns the downloaded voice note into base64 for the fast Gemini call.\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst bin = ($input.first().binary || {}).data || {};\nreturn [{ json: { b64: buf.toString('base64'), mime: String(bin.mimeType || 'audio/ogg').split(';')[0] } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "dcbd28ce-188f-4094-9d07-10e31492cc8d",
+      "name": "Fast Transcribe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2960,
+        192
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [ { inline_data: { mime_type: $json.mime, data: $json.b64 } }, { text: 'Transcribe this WhatsApp voice note word for word, in the exact language and dialect spoken. It can be English (any accent), Egyptian Arabic, Gulf Arabic, or a mix of English and Arabic. The speaker is a patient talking to a dental clinic, so expect words like: cleaning / تنظيف, whitening / تبييض, braces or aligners / تقويم, filling / حشو, root canal / علاج عصب, implant / زراعة, extraction / خلع, check-up / كشف, price / سعر / بكام, appointment / ميعاد / موعد, insurance / تأمين, names of days and times. Write English words in English letters and Arabic words in Arabic script, exactly as spoken. Write numbers as digits. Output ONLY the transcript: no translation, no summary, no comments. If there is no speech, output exactly: (empty)' } ] }], generationConfig: { maxOutputTokens: 1000, temperature: 0, thinkingConfig: { thinkingLevel: 'low' } } }) }}",
+        "method": "POST",
+        "nodeCredentialType": "googlePalmApi",
+        "options": {
+          "timeout": 20000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "dbf5c769-fc0b-4c5c-b49f-7b23429e597a",
+      "name": "Get Setup Switch",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        640
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "feature",
+              "keyValue": "clinic_setup"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allConditions",
+        "operation": "get",
+        "resource": "row",
+        "returnAll": false
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "97da41e3-99ec-49b0-8579-fb63da0a1ec0",
+      "name": "Get Setup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        336,
+        640
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "tab",
+              "keyValue": "clinic"
+            }
+          ]
+        },
+        "matchType": "allConditions",
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "47311b83-acb1-4e37-afd1-38115a5099a5",
+      "name": "Voice Reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4512,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Message Info').first().json.type === 'audio' && $('Feature Flags').isExecuted && $('Feature Flags').first().json.voice_replies === true && String($('Ask Noor').first().json.reply || '').trim().length > 0 && !/^000000000000/.test($('Message Info').first().json.phone) }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "07d39bab-52d4-4fb5-bae7-49d084b54343",
+      "name": "Make Voice",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        4736,
+        200
+      ],
+      "parameters": {
+        "input": "={{ $('Voice Text').first().json.script }}",
+        "model": "tts-1",
+        "operation": "generate",
+        "options": {
+          "binaryPropertyOutput": "data",
+          "response_format": "opus"
+        },
+        "resource": "audio",
+        "voice": "nova"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "cc0eb8c6-d02c-4656-9d5d-1c93aac90a38",
+      "name": "Upload Voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4960,
+        200
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messaging_product",
+              "parameterType": "formData",
+              "value": "whatsapp"
+            },
+            {
+              "name": "type",
+              "parameterType": "formData",
+              "value": "audio/ogg"
+            },
+            {
+              "inputDataFieldName": "data",
+              "name": "file",
+              "parameterType": "formBinaryData"
+            }
+          ]
+        },
+        "contentType": "multipart-form-data",
+        "method": "POST",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "timeout": 20000
+        },
+        "sendBody": true,
+        "url": "https://graph.facebook.com/v22.0/YOUR_PHONE_NUMBER_ID/media"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "be9dd8cf-77b9-4090-b077-4098b07f4d10",
+      "name": "Send Voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5184,
+        200
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $('Message Info').first().json.phone, type: 'audio', audio: { id: $json.id } }) }}",
+        "method": "POST",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "timeout": 15000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://graph.facebook.com/v22.0/YOUR_PHONE_NUMBER_ID/messages"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "fcae1a66-27d7-4b1f-9963-f3b9ad8fd6cf",
+      "name": "Speech Script",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        4736,
+        40
+      ],
+      "parameters": {
+        "messages": {
+          "values": [
+            {
+              "content": "={{ 'Extra rules for this voice note: start directly with the answer. Never open with phrases like \"thanks for sending that\", \"we got it\", \"got your message\", \"hey, so\" or any filler intro. Never tell the patient to bring ID. Say only what the text says, shorter if possible.\\n\\nTEXT TO SAY:\\n' + String($('Ask Noor').first().json.reply || '') }}",
+              "role": "user"
+            }
+          ]
+        },
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-haiku-4-5-20251001"
+        },
+        "operation": "message",
+        "options": {
+          "maxTokens": 300,
+          "system": "=You are Noor, a real receptionist at a dental clinic, recording a quick WhatsApp voice note back to a patient. You are glancing at the text below and just talking, calm and natural, like a real person at work. Not excited, not acting, not over-friendly.\n\nIF THE TEXT IS ENGLISH:\n- Start simply: \"Hi!\", \"Hey,\", \"Okay so\", \"Yeah, of course.\"\n- At most ONE light filler (\"um\", \"so\", \"let me see\") and only where a person would naturally pause. Often none.\n- One \"...\" where she would check the calendar. Commas for breaths.\n- Contractions always. Mix short and longer sentences.\n- Numbers and times like people say them: \"ten\", \"eleven thirty\", \"four o'clock\", \"three hundred and fifty dirhams\". Never \"half eleven\".\n\nIF THE TEXT IS ARABIC:\n- Speak ONLY in {{ (() => { try { const rows = $('Get Setup').all().map(i => i.json); const get = n => { const r = rows.find(x => x.name === n); return String((r && r.value) || '').trim().toLowerCase(); }; const d = get('arabic_dialect'); if (d.indexOf('egypt') >= 0) return 'EGYPTIAN'; if (d.indexOf('gulf') >= 0 || d.indexOf('emir') >= 0 || d.indexOf('khal') >= 0) return 'GULF (Emirati)'; return get('arabic_voice_id') === 'l10leremdijfpicq5cph' ? 'EGYPTIAN' : 'GULF (Emirati)'; } catch (e) { return 'GULF (Emirati)'; } })() }} dialect. Never formal Arabic (فصحى), never mix dialects, no words like صباحاً أو مساءً أو العاشرة.\n- Gulf style example: \"هلا والله، اي أكيد... خلني أشوف لك. يوم السبت الجاي عند دكتورة سارة، عندي الساعة عشر، أو إحدعش ونص، أو أربع العصر. والتنظيف بثلاث مية وخمسين درهم، والكشف وياه ببلاش. قول لي أي وقت يناسبك.\"\n- Egyptian style example: \"أهلاً، اه طبعاً... خليني أشوفلك. يوم السبت الجاي عند دكتورة سارة، عندي الساعة عشرة، أو حداشر ونص، أو أربعة العصر. والتنضيف بتلتمية وخمسين درهم، والكشف معاه ببلاش. قولّي أنهي معاد يناسبك.\"\n- One \"...\" for a thinking pause, at most one filler (يعني، زين، بص), often none.\n- All numbers, dates and prices as spoken dialect words, never digits. Write دكتورة/دكتور not د. Gender-neutral words for the patient when unsure.\n\nFOR BOTH:\n- Keep every fact exactly (days, dates, times, prices, names, request numbers).\n- No square-bracket tags, no lists, emojis, symbols, links or markdown. At most 60 words. If the text is long, give the main point and say you'll send the details in the chat.\nOutput only what she says.",
+          "temperature": 0.6
+        },
+        "resource": "text",
+        "simplify": true
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f51ec54b-80c4-4bbb-873d-e4c426f76482",
+      "name": "Voice Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4960,
+        40
+      ],
+      "parameters": {
+        "jsCode": "// Picks the spoken script and the ElevenLabs voice for the language (voices come from the setup sheet).\nconst reply = String($('Ask Noor').first().json.reply || '');\nconst j = $input.first().json || {};\nlet script = '';\ntry { script = String((j.content && j.content[0] && j.content[0].text) || j.text || j.output || j.message || ''); } catch (e) { script = ''; }\nif (!script.trim() || script.length > 900) script = reply;\nscript = script.replace(/\\[[^\\]]*\\]/g, '').replace(/[*_~#>`]/g, '').replace(/\\p{Extended_Pictographic}️?/gu, '').replace(/https?:\\/\\/\\S+/g, '').replace(/…/g, '...').replace(/\\s+/g, ' ').trim().slice(0, 700);\nconst setup = {};\ntry { $('Get Setup').all().forEach(function (i) { const r = i.json || {}; if (r.name) setup[String(r.name).trim()] = String(r.value || '').trim(); }); } catch (e) { /* defaults */ }\nconst arabic = /[؀-ۿ]/.test(reply);\nconst voice_id = arabic ? (setup.arabic_voice_id || 'qvaae5vgWkophsefWOzT') : (setup.english_voice_id || 'rttOA5OKNtzdQVZRYl7c');\n// eleven_v3 \"natural\" setting for both languages: human pauses, no overacting\nreturn [{ json: { script: script, script_el: script, english: !arabic, voice_id: voice_id, model_id: 'eleven_v3', voice_settings: { stability: 0.5, similarity_boost: 0.8 }, use_elevenlabs: true } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "2427f8e0-2fc2-471d-86b8-a4938197bd92",
+      "name": "Use ElevenLabs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5184,
+        40
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.use_elevenlabs === true }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "b8a0d27a-1116-4eea-a003-03cee5dd9bb4",
+      "name": "ElevenLabs Voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5408,
+        -40
+      ],
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "contentType": "json",
+        "genericAuthType": "httpHeaderAuth",
+        "jsonBody": "={{ JSON.stringify({ text: $json.script_el || $json.script, model_id: $json.model_id || 'eleven_multilingual_v2', voice_settings: $json.voice_settings || { stability: 0.3, similarity_boost: 0.75, style: 0.15, use_speaker_boost: true, speed: 1.0 } }) }}",
+        "method": "POST",
+        "options": {
+          "response": {
+            "response": {
+              "outputPropertyName": "data",
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 25000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $json.voice_id || 'm4hBEimiy2ffkQ0hHMVD' }}?output_format=opus_48000_64"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "b78dbac3-71d1-4280-9041-c2692648d307",
+      "name": "Mark As Voice Note",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5632,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "// ElevenLabs sends Ogg/Opus; label it so WhatsApp shows it as a voice note.\nconst out = [];\nfor (const item of $input.all()) {\n  if (item.binary && item.binary.data) {\n    item.binary.data.mimeType = 'audio/ogg';\n    item.binary.data.fileName = 'noor.ogg';\n    item.binary.data.fileExtension = 'ogg';\n  }\n  out.push(item);\n}\nreturn out;\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "67f89173-9427-45bb-b7ca-4969c2b2b0e4",
+      "name": "Group On?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2600,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Message Info').first().json.type === 'text' && $('Feature Flags').isExecuted && $('Feature Flags').first().json.message_grouping === true }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "6684c7fd-ee18-4000-9e76-ff9f0b55209a",
+      "name": "Queue Message",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2824,
+        640
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "msg_id",
+              "id": "msg_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "text",
+              "id": "text",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "at_ms",
+              "id": "at_ms",
+              "required": false,
+              "type": "number"
+            }
+          ],
+          "value": {
+            "at_ms": "={{ Date.now() }}",
+            "msg_id": "={{ $('Only Patient Messages').first().json.messages[0].id }}",
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "text": "={{ $('Message Info').first().json.text }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "94a2d355-7dff-48dd-92af-4f4445fa4e3f",
+      "name": "Wait For More",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3048,
+        640
+      ],
+      "parameters": {
+        "amount": 6,
+        "resume": "timeInterval",
+        "unit": "seconds"
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "edb3b3d2-0bcc-4333-8ce0-107bdb7cbe92",
+      "name": "Get Recent Messages",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3272,
+        640
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "phone",
+              "keyValue": "={{ $('Message Info').first().json.phone }}"
+            }
+          ]
+        },
+        "matchType": "allConditions",
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "d9f040ae-5b9a-46f2-bbf3-24a1cec411c0",
+      "name": "Group Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3496,
+        640
+      ],
+      "parameters": {
+        "jsCode": "// Several quick messages from the same patient are answered together. Only the run for the newest message continues.\nconst me = $('Message Info').first().json;\nconst myId = String($('Only Patient Messages').first().json.messages[0].id || '');\nlet rows = [];\ntry { rows = $('Get Recent Messages').all().map(function (i) { return i.json || {}; }).filter(function (r) { return String(r.phone) === String(me.phone) && r.msg_id; }); } catch (e) { rows = []; }\nrows.sort(function (a, b) { return Number(a.at_ms) - Number(b.at_ms); });\nconst now = Date.now();\nconst recent = rows.filter(function (r) { return now - Number(r.at_ms) <= 120000; });\nconst mine = recent.some(function (r) { return String(r.msg_id) === myId; });\nif (!recent.length || !mine) return [{ json: { combined: String(me.text || ''), count: 1, latest_ms: now } }];\nconst latest = recent[recent.length - 1];\nif (String(latest.msg_id) !== myId) return []; // a newer message will answer all of them\nconst texts = recent.map(function (r) { return String(r.text || '').trim(); }).filter(Boolean);\nreturn [{ json: { combined: texts.length > 1 ? texts.join('\\n') : String(me.text || ''), count: Math.max(1, texts.length), latest_ms: Number(latest.at_ms) } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "af368d73-b8a3-4be7-b9d4-c92550b51024",
+      "name": "Clear Grouped",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3720,
+        640
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "phone",
+              "keyValue": "={{ $('Message Info').first().json.phone }}"
+            },
+            {
+              "condition": "lte",
+              "keyName": "at_ms",
+              "keyValue": "={{ $('Group Messages').first().json.latest_ms }}"
+            }
+          ]
+        },
+        "matchType": "allConditions",
+        "operation": "deleteRows",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "bca79ab1-88c8-4b91-99ec-6d16b6cb583f",
+      "name": "Format Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5200,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Offered appointment times become tap-to-choose buttons (2-3 times) or a list (4-9 times). Switch: time_buttons.\nconst reply = String($('Ask Noor').first().json.reply || '');\nlet on = false;\ntry { $('Get Settings').all().forEach(function (i) { const r = i.json || {}; if (String(r.feature || '').trim() === 'time_buttons') on = String(r.enabled).trim().toUpperCase() === 'TRUE'; }); } catch (e) { on = false; }\nconst none = [{ json: { has_choices: false } }];\nif (!on || !reply || reply.length > 1000) return none;\nconst ar = /[؀-ۿ]/.test(reply);\nconst timeG = /(\\d{1,2}[:.]\\d{2}(?:\\s*[ap]\\.?m\\.?)?|\\b\\d{1,2}\\s*[ap]\\.?m\\.?|[٠-٩]{1,2}[:.][٠-٩]{2})(?:\\s*(?:صباحاً|صباحا|مساءً|مساء|ظهراً|عصراً|ص|م)(?![؀-ۿ]))?/gi;\nconst dayRe = /(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|الاثنين|الإثنين|الثلاثاء|الأربعاء|الاربعاء|الخميس|الجمعة|السبت|الأحد|الاحد|اليوم|بكرة|بكره|غداً|غدا)/i;\nconst bullet = /^\\s*(?:[-•*·▪◦–]|\\d{1,2}[.)]|[٠-٩]{1,2}[.)])\\s*/;\nlet day = '';\nlet bad = false;\nconst opts = [];\nreply.split('\\n').forEach(function (line) {\n  const t = line.trim();\n  if (!t) return;\n  const times = t.match(timeG) || [];\n  const dm = t.match(dayRe);\n  if (!bullet.test(t)) { if (dm && !times.length) day = dm[0]; return; }\n  if (!times.length) return;\n  if (times.length > 1 && /,|،|\\bor\\b|أو/.test(t)) { bad = true; return; }\n  const clean = t.replace(bullet, '').replace(/[*_~]/g, '').trim();\n  opts.push({ clean: clean, time: times[0].trim(), day: dm ? dm[0] : day });\n});\nif (bad || opts.length < 2 || opts.length > 9) return none;\nconst days = Array.from(new Set(opts.map(function (o) { return String(o.day || '').toLowerCase(); })));\nconst short = function (d) { if (!d) return ''; return /^[a-z]/i.test(d) ? d.charAt(0).toUpperCase() + d.slice(1, 3).toLowerCase() : d; };\nconst seen = {};\nconst choices = [];\nopts.forEach(function (o) {\n  const title = ((days.length > 1 && o.day ? short(o.day) + ' ' : '') + o.time.replace(/\\s+/g, ' ')).slice(0, 20);\n  if (seen[title]) return;\n  seen[title] = 1;\n  const full = (o.day && !dayRe.test(o.clean) ? o.day + ' ' : '') + o.clean;\n  choices.push({ id: ('opt:' + full).slice(0, 200), title: title, description: full.slice(0, 72) });\n});\nif (choices.length < 2) return none;\nconst other = { id: 'opt:other', title: ar ? 'موعد آخر' : 'Another time' };\nlet interactive;\nif (choices.length <= 3) {\n  const btns = choices.map(function (c) { return { type: 'reply', reply: { id: c.id, title: c.title } }; });\n  if (btns.length < 3) btns.push({ type: 'reply', reply: other });\n  interactive = { type: 'button', body: { text: reply }, action: { buttons: btns } };\n} else {\n  const rows = choices.map(function (c) { return { id: c.id, title: c.title.slice(0, 24), description: c.description }; });\n  rows.push({ id: other.id, title: other.title });\n  interactive = { type: 'list', body: { text: reply }, action: { button: ar ? 'اختر الموعد' : 'Choose a time', sections: [{ title: ar ? 'المواعيد المتاحة' : 'Available times', rows: rows }] } };\n}\nreturn [{ json: { has_choices: true, interactive: interactive, count: choices.length } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "3671f01c-d5fe-47d3-ad3c-e9551f9770e1",
+      "name": "Has Choices?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5424,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_choices === true }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "45f4f3fd-7ef3-42f9-af36-7438525ea168",
+      "name": "Send Choices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5648,
+        200
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: $('Message Info').first().json.phone, type: 'interactive', interactive: $json.interactive }) }}",
+        "method": "POST",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "timeout": 15000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://graph.facebook.com/v22.0/YOUR_PHONE_NUMBER_ID/messages"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "8df42165-f1b9-4cea-9ed6-9a0cb9a83803",
+      "name": "Opt Out?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2400,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ /^\\s*(stop|unsubscribe|إيقاف|ايقاف|الغاء الاشتراك|إلغاء الاشتراك)\\s*[.!]?\\s*$/i.test(String($('Message Info').first().json.text || '')) }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "977fbf74-f0b1-46c2-8f6a-317ad36aeedb",
+      "name": "Save Opt Out",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2624,
+        560
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "last_message_at",
+              "id": "last_message_at",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "last_message_at": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}",
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "status": "opted_out"
+          }
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "appendOrUpdate",
+        "options": {
+          "cellFormat": "RAW"
+        },
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a4f73a1e-09e1-4033-b454-99641e839fd2",
+      "name": "Confirm Opt Out",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2848,
+        560
+      ],
+      "parameters": {
+        "messageType": "text",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Message Info').first().json.phone }}",
+        "resource": "message",
+        "textBody": "={{ /[؀-ۿ]/.test(String($('Message Info').first().json.text || '')) ? 'تمام، لن نرسل لك رسائل تلقائية بعد الآن. إذا احتجت أي شيء أو أردت حجز موعد، راسلنا هنا في أي وقت.' : \"Done, you won't get any more automatic messages from us. If you need anything or want to book, just message us here anytime.\" }}"
+      },
+      "onError": "continueRegularOutput",
+      "executeOnce": true,
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "a3fa992f-12f8-444f-bdde-6b52176917a1",
+      "name": "Scribe Transcribe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1700,
+        300
+      ],
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model_id",
+              "parameterType": "formData",
+              "value": "scribe_v1"
+            },
+            {
+              "inputDataFieldName": "data",
+              "name": "file",
+              "parameterType": "formBinaryData"
+            },
+            {
+              "name": "tag_audio_events",
+              "parameterType": "formData",
+              "value": "false"
+            }
+          ]
+        },
+        "contentType": "multipart-form-data",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "options": {
+          "timeout": 15000
+        },
+        "sendBody": true,
+        "url": "https://api.elevenlabs.io/v1/speech-to-text"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "cf43d4ed-8c0f-4dc3-8e63-5da91df4a89f",
+      "name": "Heard It?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ String($json.text || '').trim().length > 0 }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "264f03d1-4267-4e73-ad85-8ca72932a6a3",
+      "name": "Report Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        900
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Message Info').first().json.phone === $('Message Info').first().json.owner_phone && /^\\s*#?\\s*(report|تقرير)\\s*$/i.test(String($('Message Info').first().json.text || '')) }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "159a0637-d30a-44a7-a3b7-25e8596bae10",
+      "name": "Run PDF Report",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2420,
+        820
+      ],
+      "parameters": {
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        },
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Owner Business Report",
+          "mode": "id",
+          "value": "aoWJbu9nJXColPXK"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b4d244fd-1372-4330-8fcf-ced49a10ed89",
+      "name": "Track Source",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        700
+      ],
+      "parameters": {
+        "jsCode": "// Lead source: where did this patient come from? Saves one row for each new patient, and for every tap on a Click-to-WhatsApp ad.\nconst flags = (function () { try { return $('Feature Flags').first().json || {}; } catch (e) { return {}; } })();\nif (flags.source_tracking === false) return [];\nconst info = $('Message Info').first().json || {};\nif (info.is_owner_command || String(info.phone) === String(info.owner_phone) || /^000000000000/.test(String(info.phone))) return [];\nconst m = (($('Only Patient Messages').first().json || {}).messages || [])[0] || {};\nconst p = $('Lookup Patient').first().json || {};\nconst isNew = !String(p.phone || '').replace(/\\D/g, '');\nconst ref = m.referral || null;\nconst text = String(info.text || '');\nconst low = text.toLowerCase();\nlet source = '', detail = '', adId = '';\nif (ref) {\n  source = ref.source_type === 'post' ? 'facebook_instagram_post' : 'meta_ad';\n  detail = String(ref.headline || ref.body || ref.source_url || '').slice(0, 200);\n  adId = String(ref.source_id || '');\n} else {\n  const tag = (text.match(/\\[(ig|instagram|fb|facebook|tt|tiktok|google|maps|gmb|web|site|website|qr|snap|snapchat|ref:[\\w-]+)\\]/i) || [])[1];\n  const map = { ig: 'instagram', instagram: 'instagram', fb: 'facebook', facebook: 'facebook', tt: 'tiktok', tiktok: 'tiktok', google: 'google', maps: 'google', gmb: 'google', web: 'website', site: 'website', website: 'website', qr: 'qr_code', snap: 'snapchat', snapchat: 'snapchat' };\n  if (tag) { source = map[tag.toLowerCase()] || tag.toLowerCase().replace('ref:', ''); detail = 'link tag'; }\n  else if (isNew) {\n    const words = [['instagram', 'instagram'], ['insta', 'instagram'], ['انستا', 'instagram'], ['tiktok', 'tiktok'], ['تيك توك', 'tiktok'], ['facebook', 'facebook'], ['فيسبوك', 'facebook'], ['فيس بوك', 'facebook'], ['snapchat', 'snapchat'], ['سناب', 'snapchat'], ['google', 'google'], ['جوجل', 'google'], ['قوقل', 'google'], ['website', 'website'], ['موقع', 'website'], ['friend', 'referral'], ['صديق', 'referral'], ['recommend', 'referral']];\n    const hit = words.find(function (w) { return low.indexOf(w[0]) >= 0; });\n    source = hit ? hit[1] : 'direct_whatsapp';\n    detail = hit ? 'first message mentions ' + hit[0] : '';\n  }\n}\nif (!source) return [];\nreturn [{ json: { phone: String(info.phone), name: String(p.name || info.profile_name || ''), source: source, detail: detail, ad_id: adId, is_new: isNew ? 'TRUE' : 'FALSE', first_message: text.slice(0, 300), time: DateTime.now().setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "cbb6a4b1-5701-4867-9be2-c39a421d125d",
+      "name": "Save Source",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        700
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "name",
+              "id": "name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "source",
+              "id": "source",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "detail",
+              "id": "detail",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "ad_id",
+              "id": "ad_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "is_new",
+              "id": "is_new",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "first_message",
+              "id": "first_message",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "time",
+              "id": "time",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "ad_id": "={{ $json.ad_id }}",
+            "detail": "={{ $json.detail }}",
+            "first_message": "={{ $json.first_message }}",
+            "is_new": "={{ $json.is_new }}",
+            "name": "={{ $json.name }}",
+            "phone": "={{ $json.phone }}",
+            "source": "={{ $json.source }}",
+            "time": "={{ $json.time }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "5544fae3-57df-4994-a2d6-0a11715de56c",
+      "name": "Needs Approval?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3560,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Feature Flags').isExecuted && $('Feature Flags').first().json.approval_mode === true && String($('Ask Noor').first().json.reply || '').trim().length > 0 && !/^000000000000/.test($('Message Info').first().json.phone) }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "0813a010-59b8-48ca-9ac2-0e35fdd9bb11",
+      "name": "Save Draft",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3780,
+        720
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "name",
+              "id": "name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "patient_text",
+              "id": "patient_text",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "reply",
+              "id": "reply",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "created",
+              "id": "created",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "created": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}",
+            "name": "={{ $('Lookup Patient').first().json.name || $('Message Info').first().json.profile_name || '' }}",
+            "patient_text": "={{ String($('Message Info').first().json.text || ('(' + $('Message Info').first().json.type + ')')).slice(0, 1000) }}",
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "reply": "={{ $('Ask Noor').first().json.reply }}",
+            "status": "pending"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "248a6397-defd-4566-83c8-5f5451ebbffb",
+      "name": "Alert Draft",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        4000,
+        720
+      ],
+      "parameters": {
+        "messageType": "text",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ (() => { const r = $('Get Settings').all().map(i => i.json || {}).find(x => String(x.feature || '').trim() === 'approval_alert'); if (r && String(r.enabled).trim().toUpperCase() === 'FALSE') return ''; if (/^9715000/.test($('Message Info').first().json.phone)) return ''; return $('Message Info').first().json.owner_phone; })() }}",
+        "resource": "message",
+        "textBody": "=[Approve Noor's reply] +{{ $('Message Info').first().json.phone }}{{ $('Message Info').first().json.profile_name ? ' (' + $('Message Info').first().json.profile_name + ')' : '' }}: {{ String($('Message Info').first().json.text || '').slice(0, 300) }}\n\nNoor wants to answer:\n{{ String($('Ask Noor').first().json.reply || '').slice(0, 700) }}\n\nApprove, edit or reject in the inbox: https://YOUR-INSTANCE.app.n8n.cloud/webhook/your-webhook-path"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    }
+  ],
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Only Patient Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Info": {
+      "main": [
+        [
+          {
+            "node": "Log Incoming",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Incoming": {
+      "main": [
+        [
+          {
+            "node": "Lookup Patient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Patient": {
+      "main": [
+        [
+          {
+            "node": "Takeover Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Track Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Message": {
+      "main": [
+        [
+          {
+            "node": "Ask Owner Mode",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Voice File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Photo File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Document Received",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Opt Out?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Voice File": {
+      "main": [
+        [
+          {
+            "node": "Download Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reply": {
+      "main": [
+        [
+          {
+            "node": "Log Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Photo File": {
+      "main": [
+        [
+          {
+            "node": "Download Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Photo": {
+      "main": [
+        [
+          {
+            "node": "Read Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Card": {
+      "main": [
+        [
+          {
+            "node": "Parse Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Card": {
+      "main": [
+        [
+          {
+            "node": "Is It an Insurance Card?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is It an Insurance Card?": {
+      "main": [
+        [
+          {
+            "node": "Save Insurance Card",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask Noor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Insurance Card": {
+      "main": [
+        [
+          {
+            "node": "Mark Card Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Card Received": {
+      "main": [
+        [
+          {
+            "node": "Reply About Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply About Card": {
+      "main": [
+        [
+          {
+            "node": "Alert Staff: Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Document Received": {
+      "main": [
+        [
+          {
+            "node": "Reply About Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply About Document": {
+      "main": [
+        [
+          {
+            "node": "Alert Staff: Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sorry Reply": {
+      "main": [
+        [
+          {
+            "node": "Alert Staff: Noor Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Voice": {
+      "main": [
+        [
+          {
+            "node": "Ask Noor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Voice Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Voice Again": {
+      "main": [
+        [
+          {
+            "node": "Backup Transcribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feature Flags": {
+      "main": [
+        [
+          {
+            "node": "Typing On?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing On?": {
+      "main": [
+        [
+          {
+            "node": "Show Typing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Takeover Check": {
+      "main": [
+        [
+          {
+            "node": "Takeover Command",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Forward To Staff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply To Patient?": {
+      "main": [
+        [
+          {
+            "node": "Send Staff Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Confirm To Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Staff Reply": {
+      "main": [
+        [
+          {
+            "node": "Log Staff Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Staff Reply": {
+      "main": [
+        [
+          {
+            "node": "Confirm To Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Settings": {
+      "main": [
+        [
+          {
+            "node": "Get Takeover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Takeover": {
+      "main": [
+        [
+          {
+            "node": "Feature Flags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Takeover Command": {
+      "main": [
+        [
+          {
+            "node": "Save Takeover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Takeover": {
+      "main": [
+        [
+          {
+            "node": "Reply To Patient?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Owner Mode": {
+      "main": [
+        [
+          {
+            "node": "Send Owner Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backup Transcribe": {
+      "main": [
+        [
+          {
+            "node": "Ask Noor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Noor": {
+      "main": [
+        [
+          {
+            "node": "Needs Approval?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sorry Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice To Base64": {
+      "main": [
+        [
+          {
+            "node": "Fast Transcribe",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Voice Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fast Transcribe": {
+      "main": [
+        [
+          {
+            "node": "Ask Noor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Voice Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only Patient Messages": {
+      "main": [
+        [
+          {
+            "node": "Get Setup Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Setup Switch": {
+      "main": [
+        [
+          {
+            "node": "Get Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Setup": {
+      "main": [
+        [
+          {
+            "node": "Message Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Voice": {
+      "main": [
+        [
+          {
+            "node": "Upload Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Voice": {
+      "main": [
+        [
+          {
+            "node": "Send Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice Reply?": {
+      "main": [
+        [
+          {
+            "node": "Speech Script",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Speech Script": {
+      "main": [
+        [
+          {
+            "node": "Voice Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice Text": {
+      "main": [
+        [
+          {
+            "node": "Use ElevenLabs?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs Voice": {
+      "main": [
+        [
+          {
+            "node": "Mark As Voice Note",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Make Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark As Voice Note": {
+      "main": [
+        [
+          {
+            "node": "Upload Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use ElevenLabs?": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs Voice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Make Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group On?": {
+      "main": [
+        [
+          {
+            "node": "Queue Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask Noor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Message": {
+      "main": [
+        [
+          {
+            "node": "Wait For More",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For More": {
+      "main": [
+        [
+          {
+            "node": "Get Recent Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Messages": {
+      "main": [
+        [
+          {
+            "node": "Group Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Messages": {
+      "main": [
+        [
+          {
+            "node": "Clear Grouped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Grouped": {
+      "main": [
+        [
+          {
+            "node": "Ask Noor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Voice": {
+      "main": [
+        [
+          {
+            "node": "Format Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Reply": {
+      "main": [
+        [
+          {
+            "node": "Has Choices?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Choices?": {
+      "main": [
+        [
+          {
+            "node": "Send Choices",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Choices": {
+      "main": [
+        [
+          {
+            "node": "Log Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Opt Out?": {
+      "main": [
+        [
+          {
+            "node": "Save Opt Out",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Group On?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Opt Out": {
+      "main": [
+        [
+          {
+            "node": "Confirm Opt Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Voice": {
+      "main": [
+        [
+          {
+            "node": "Scribe Transcribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scribe Transcribe": {
+      "main": [
+        [
+          {
+            "node": "Heard It?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Voice Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Heard It?": {
+      "main": [
+        [
+          {
+            "node": "Ask Noor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Voice Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Request?": {
+      "main": [
+        [
+          {
+            "node": "Run PDF Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Source": {
+      "main": [
+        [
+          {
+            "node": "Save Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Approval?": {
+      "main": [
+        [
+          {
+            "node": "Save Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Voice Reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Draft": {
+      "main": [
+        [
+          {
+            "node": "Alert Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

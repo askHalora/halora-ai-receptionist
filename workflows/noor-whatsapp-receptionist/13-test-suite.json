@@ -1,0 +1,352 @@
+{
+  "name": "Noor – Test Suite (manual)",
+  "nodes": [
+    {
+      "id": "658ed63b-7937-4b2b-9b49-2ea42f234e6b",
+      "name": "Run All Tests",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "1e36c29f-66d9-4bc4-ae6a-aefc0f70b82e",
+      "name": "Get Tests",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "returnAll": true
+      }
+    },
+    {
+      "id": "28c662bc-f56d-4c75-a495-58290da9cd6b",
+      "name": "Build Turns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// One item per message. Every case gets its own fake phone (9715000009...), unique per run, so history never mixes.\nconst run = DateTime.now().setZone('Asia/Dubai').toFormat('MMddHHmm');\nconst out = [];\n$input.all().forEach(function (it, i) {\n  const c = it.json || {};\n  let t = {};\n  try { t = JSON.parse(c.turns || '{}'); } catch (e) { t = {}; }\n  const phone = '000000000000' + run.slice(4) + String(i + 10);\n  (t.msgs || []).forEach(function (m, k) {\n    out.push({ json: { run: run, case_id: c.case_id, area: c.area, turn: k, last: k === (t.msgs.length - 1), phone: phone, text: m, patient: JSON.stringify(t.patient || {}), expect_tools: c.expect_tools || '', expect_text: c.expect_text || '', forbid_text: c.forbid_text || '', language: c.language || '' } });\n  });\n});\nreturn out;\n"
+      }
+    },
+    {
+      "id": "3c403e30-48d8-4ebd-adcb-92bfde89b12e",
+      "name": "Ask Noor",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "bzMsSKoPaAskxlyN",
+          "cachedResultName": "Noor – Patient Brain"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "phone": "={{ $json.phone }}",
+            "profile_name": "Test Patient",
+            "type": "text",
+            "text": "={{ $json.text }}",
+            "patient": "={{ $json.patient }}",
+            "test_mode": "yes"
+          },
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "profile_name",
+              "displayName": "profile_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient",
+              "displayName": "patient",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "49680030-4589-4ab5-886d-a74dba90f040",
+      "name": "Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Compares each case with what was expected: tools called, text that must / must not appear, reply language.\nconst turns = $('Build Turns').all().map(function (i) { return i.json; });\nconst answers = $input.all().map(function (i) { return i.json || {}; });\nconst cases = {};\nturns.forEach(function (t, i) {\n  const a = answers[i] || {};\n  const c = cases[t.case_id] = cases[t.case_id] || { meta: t, replies: [], tools: [], chars: 0, error: '' };\n  c.meta = t;\n  c.replies.push(String(a.reply || ''));\n  String(a.tools || '').split(',').filter(Boolean).forEach(function (x) { c.tools.push(x); });\n  c.chars = Math.max(c.chars, Number(a.prompt_chars || 0));\n  if (a.error || !a.reply) c.error = String((a.error && (a.error.message || a.error)) || 'no reply');\n});\nconst rows = Object.keys(cases).map(function (id) {\n  const c = cases[id];\n  const m = c.meta;\n  const last = c.replies[c.replies.length - 1] || '';\n  const all = c.replies.join('\\n');\n  const why = [];\n  if (c.error) why.push('error: ' + c.error);\n  String(m.expect_tools).split(',').map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (x) {\n    if (x.charAt(0) === '!') { if (c.tools.indexOf(x.slice(1)) >= 0) why.push('should not call ' + x.slice(1)); }\n    else if (c.tools.indexOf(x) < 0) why.push('did not call ' + x);\n  });\n  if (m.expect_text) { try { if (!new RegExp(m.expect_text, 'i').test(last)) why.push('missing: ' + m.expect_text); } catch (e) { why.push('bad expect pattern'); } }\n  if (m.forbid_text) { try { if (new RegExp(m.forbid_text, 'i').test(all)) why.push('said forbidden: ' + m.forbid_text); } catch (e) { why.push('bad forbid pattern'); } }\n  const ar = (last.match(/[\\u0600-\\u06FF]/g) || []).length;\n  const hi = (last.match(/[\\u0900-\\u097F]/g) || []).length;\n  if (m.language === 'ar' && ar < 10) why.push('reply not in Arabic');\n  if (m.language === 'hi' && hi < 10) why.push('reply not in Hindi');\n  if (m.language === 'en' && (ar > 10 || hi > 10)) why.push('reply not in English');\n  return { json: { run: m.run, case_id: id, area: m.area, result: why.length ? 'FAIL' : 'PASS', reason: why.join('; '), reply: last.slice(0, 700), tools: c.tools.join(','), prompt_chars: c.chars } };\n});\nreturn rows;\n"
+      }
+    },
+    {
+      "id": "2e15f92e-d93e-4f9a-88a2-1df0e4396bdd",
+      "name": "Save Results",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run": "={{ $json.run }}",
+            "case_id": "={{ $json.case_id }}",
+            "area": "={{ $json.area }}",
+            "result": "={{ $json.result }}",
+            "reason": "={{ $json.reason }}",
+            "reply": "={{ $json.reply }}",
+            "tools": "={{ $json.tools }}",
+            "prompt_chars": "={{ $json.prompt_chars }}"
+          },
+          "schema": [
+            {
+              "id": "run",
+              "displayName": "run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "area",
+              "displayName": "area",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "result",
+              "displayName": "result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reply",
+              "displayName": "reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tools",
+              "displayName": "tools",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prompt_chars",
+              "displayName": "prompt_chars",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "63fad262-e03c-495a-9acd-fb2251bec901",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows = $('Score').all().map(function (i) { return i.json; });\nconst failed = rows.filter(function (r) { return r.result === 'FAIL'; });\nconst avg = Math.round(rows.reduce(function (s, r) { return s + (r.prompt_chars || 0); }, 0) / Math.max(1, rows.length));\nreturn [{ json: { run: rows.length ? rows[0].run : '', total: rows.length, passed: rows.length - failed.length, score: Math.round(100 * (rows.length - failed.length) / Math.max(1, rows.length)) + '%', average_prompt_chars: avg, failed: failed.map(function (r) { return r.case_id + ' (' + r.area + '): ' + r.reason; }) } }];\n"
+      }
+    }
+  ],
+  "connections": {
+    "Run All Tests": {
+      "main": [
+        [
+          {
+            "node": "Get Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tests": {
+      "main": [
+        [
+          {
+            "node": "Build Turns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Turns": {
+      "main": [
+        [
+          {
+            "node": "Ask Noor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Noor": {
+      "main": [
+        [
+          {
+            "node": "Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score": {
+      "main": [
+        [
+          {
+            "node": "Save Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Results": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

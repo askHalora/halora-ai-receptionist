@@ -1,0 +1,725 @@
+{
+  "name": "Noor – Sync Sheets to Data Tables",
+  "nodes": [
+    {
+      "id": "947e7823-1b51-42b7-8564-d6d70d5ec49f",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "26dafd1a-f0b4-48ab-9a40-a96741f84013",
+      "name": "Read Settings Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "3411c1b8-edf5-4591-bb50-9beb19a6a86c",
+      "name": "Clear Settings",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "clear",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "332eeeaf-e7db-43ec-b9dd-966485f7e428",
+      "name": "Settings Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return $('Read Settings Tab').all().map(function (i) { const r = i.json || {}; return { json: { feature: String(r.feature || '').trim(), enabled: String(r.enabled === undefined ? '' : r.enabled).trim().toUpperCase(), notes: String(r.notes || ''), instructions: String(r.instructions || '') } }; }).filter(function (i) { return i.json.feature; });\n"
+      }
+    },
+    {
+      "id": "77ac0062-6ec0-46a6-a29a-2bed483a8783",
+      "name": "Insert Settings",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "feature": "={{ $json.feature }}",
+            "enabled": "={{ $json.enabled }}",
+            "notes": "={{ $json.notes }}",
+            "instructions": "={{ $json.instructions }}"
+          },
+          "schema": [
+            {
+              "id": "feature",
+              "displayName": "feature",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "enabled",
+              "displayName": "enabled",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "instructions",
+              "displayName": "instructions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "optimizeBulk": true
+        }
+      }
+    },
+    {
+      "id": "97b27dbc-5016-4094-81b3-2ca2e3f0c741",
+      "name": "Read Knowledge Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "46cc5940-1a1f-41c4-b53d-9fbaf2cd2c3a",
+      "name": "Clear Knowledge",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "clear",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "91f915e8-253a-47b6-9c31-95fa2c5698c5",
+      "name": "Knowledge Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return $('Read Knowledge Tab').all().map(function (i) { const r = i.json || {}; return { json: { topic: String(r.topic || '').trim(), keywords: String(r.keywords || ''), answer: String(r.answer || '') } }; }).filter(function (i) { return i.json.topic && i.json.answer; });\n"
+      }
+    },
+    {
+      "id": "860cc7c3-b95c-457f-ac68-cecf6c6af2f8",
+      "name": "Insert Knowledge",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "topic": "={{ $json.topic }}",
+            "keywords": "={{ $json.keywords }}",
+            "answer": "={{ $json.answer }}"
+          },
+          "schema": [
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "keywords",
+              "displayName": "keywords",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "answer",
+              "displayName": "answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "optimizeBulk": true
+        }
+      }
+    },
+    {
+      "id": "f1eb73c2-4d0e-4f83-9c8e-32d29bb4ff06",
+      "name": "Read Clinic Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "read",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "042fb5de-83ab-4a32-b9ca-6ffb7acbd1d1",
+      "name": "Read Prices Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2240,
+        0
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "read",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "2a765adc-2c7c-4234-a602-ee0c8c8bb5ab",
+      "name": "Read Dentists Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2464,
+        0
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "read",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "0ee64514-85ea-467a-97bb-989ad2351bb1",
+      "name": "Setup Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Turns the Clinic Setup, Prices and Dentists tabs into rows for the noor_setup data table.\nfunction rows(n) { try { return $(n).all().map(function (i) { return i.json || {}; }); } catch (e) { return []; } }\nfunction s(v) { return v === undefined || v === null ? '' : String(v).trim(); }\nconst out = [];\nlet n = 0;\nrows('Read Clinic Tab').forEach(function (r) { if (s(r.setting)) out.push({ tab: 'clinic', name: s(r.setting), value: s(r.value), option: '', words: '', minutes: '', notes: s(r.notes), sort: n++ }); });\nrows('Read Prices Tab').forEach(function (r) { if (s(r.service) && s(r.price) !== '') out.push({ tab: 'price', name: s(r.service), value: s(r.price).replace(/[^0-9.]/g, ''), option: s(r.from).toLowerCase(), words: s(r.keywords), minutes: s(r.minutes) || '30', notes: s(r.notes), sort: n++ }); });\nrows('Read Dentists Tab').forEach(function (r) { if (s(r.dentist)) out.push({ tab: 'dentist', name: s(r.dentist), value: s(r.specialty), option: s(r.gender), words: s(r.keywords), minutes: '', notes: s(r.days), sort: n++ }); });\nreturn out.map(function (r) { return { json: r }; });\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "326ca74d-0f01-47fa-876e-7b5ff8716fa3",
+      "name": "Clear Setup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2912,
+        0
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "clear",
+        "resource": "table"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "aca324b6-7e80-4535-93aa-84900e8d84cb",
+      "name": "Setup Rows Again",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3136,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return $('Setup Rows').all();\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "34106552-fed9-4efc-93fb-280c5a236e22",
+      "name": "Insert Setup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3360,
+        0
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "tab",
+              "id": "tab",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "name",
+              "id": "name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "value",
+              "id": "value",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "option",
+              "id": "option",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "words",
+              "id": "words",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "minutes",
+              "id": "minutes",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "notes",
+              "id": "notes",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "sort",
+              "id": "sort",
+              "required": false,
+              "type": "number"
+            }
+          ],
+          "value": {
+            "minutes": "={{ $json.minutes }}",
+            "name": "={{ $json.name }}",
+            "notes": "={{ $json.notes }}",
+            "option": "={{ $json.option }}",
+            "sort": "={{ $json.sort }}",
+            "tab": "={{ $json.tab }}",
+            "value": "={{ $json.value }}",
+            "words": "={{ $json.words }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {
+          "optimizeBulk": true
+        },
+        "resource": "row"
+      }
+    }
+  ],
+  "connections": {
+    "Read Settings Tab": {
+      "main": [
+        [
+          {
+            "node": "Clear Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Settings": {
+      "main": [
+        [
+          {
+            "node": "Settings Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings Rows": {
+      "main": [
+        [
+          {
+            "node": "Insert Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Settings": {
+      "main": [
+        [
+          {
+            "node": "Read Knowledge Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Knowledge Tab": {
+      "main": [
+        [
+          {
+            "node": "Clear Knowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Knowledge": {
+      "main": [
+        [
+          {
+            "node": "Knowledge Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Rows": {
+      "main": [
+        [
+          {
+            "node": "Insert Knowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Knowledge": {
+      "main": [
+        [
+          {
+            "node": "Read Clinic Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Clinic Tab": {
+      "main": [
+        [
+          {
+            "node": "Read Prices Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Prices Tab": {
+      "main": [
+        [
+          {
+            "node": "Read Dentists Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Dentists Tab": {
+      "main": [
+        [
+          {
+            "node": "Setup Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup Rows": {
+      "main": [
+        [
+          {
+            "node": "Clear Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Setup": {
+      "main": [
+        [
+          {
+            "node": "Setup Rows Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup Rows Again": {
+      "main": [
+        [
+          {
+            "node": "Insert Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Read Settings Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

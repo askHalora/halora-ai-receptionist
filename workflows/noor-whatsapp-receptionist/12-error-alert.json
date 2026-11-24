@@ -1,0 +1,97 @@
+{
+  "name": "Noor – Error Alert",
+  "nodes": [
+    {
+      "id": "1abca147-b355-453a-a369-5cb785795962",
+      "name": "When a Noor Workflow Fails",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "93dbdb59-ea1f-47c5-ab3c-1bfe7c58bbcc",
+      "name": "Alert Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ (() => { try { const r = $('Get Setup').all().map(i => i.json || {}).find(x => x.tab === 'clinic' && x.name === 'support_phone'); const p = r ? String(r.value).replace(/\\D/g, '') : ''; return p.length >= 8 ? p : '000000000000'; } catch (e) { return '000000000000'; } })() }}",
+        "messageType": "text",
+        "textBody": "={{ (() => { const f = $('When a Noor Workflow Fails').first().json; const clinic = (($('Get Setup').all().map(i => i.json || {}).find(x => x.name === 'clinic_name') || {}).value) || 'Noor'; return '[Noor ERROR – ' + clinic + '] \"' + f.workflow.name + '\" failed at step \"' + f.execution.lastNodeExecuted + '\": ' + String((f.execution.error && f.execution.error.message) || 'unknown error').slice(0, 300) + '\\nOpen: ' + f.execution.url; })() }}"
+      },
+      "webhookId": "REPLACE_ME",
+      "executeOnce": true
+    },
+    {
+      "id": "56f2bef6-d11a-47b1-9b6c-6085b112aec9",
+      "name": "Get Setup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        200
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "tab",
+              "keyValue": "clinic"
+            }
+          ]
+        },
+        "matchType": "allConditions",
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "When a Noor Workflow Fails": {
+      "main": [
+        [
+          {
+            "node": "Get Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Setup": {
+      "main": [
+        [
+          {
+            "node": "Alert Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

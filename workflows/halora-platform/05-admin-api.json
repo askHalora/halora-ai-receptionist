@@ -1,0 +1,466 @@
+{
+  "name": "Halora – Admin API",
+  "nodes": [
+    {
+      "id": "dfafd1e5-5f54-46c0-9d9c-a858bc48b2c4",
+      "name": "Admin Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "0adc3459-c55b-4329-9e9e-000000000000fd",
+      "name": "Get Admin Key",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ef29e051-4bca-4b27-a512-c8d4a9d89a28",
+      "name": "Check Key",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        192
+      ],
+      "parameters": {
+        "jsCode": "// Checks the admin key and decides the action. Only whitelisted fields can be changed.\nconst b = $('Admin Webhook').first().json.body || {};\nconst key = ($input.first().json || {}).admin_key || '';\nconst ok = !!key && String(b.k || '') === key;\nconst allowed = { enabled: ['yes', 'no'], alert_clinic: ['yes', 'no'], whatsapp_status: ['needs_meta_connect', 'live', 'not_in_package'], status: ['pilot', 'active', 'paused', 'cancelled'] };\nconst field = String(b.field || ''), value = String(b.value || '');\nlet route = 'deny';\nif (ok && b.action === 'list') route = 'list';\nif (ok && b.action === 'set' && allowed[field] && allowed[field].includes(value)) route = 'set';\nreturn [{ json: { route, c: String(b.c || '').toLowerCase().replace(/[^a-z0-9-]/g, ''), field, value } }];"
+      }
+    },
+    {
+      "id": "85c271fb-1770-4b9b-9d5a-cb73875b0016",
+      "name": "Route",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        672,
+        176
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "list",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "list"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "set",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "set"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Denied"
+        }
+      }
+    },
+    {
+      "id": "494adc4f-784c-4ad8-9c94-7be50d06bd2c",
+      "name": "Get All Clinics",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "af285b5b-fce6-4ccb-9360-272e05a0f621",
+      "name": "Get All Intakes",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "56956471-9d6c-40d6-b14c-7bb15cd8c65f",
+      "name": "Get All Requests",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "limit": 500,
+        "orderBy": true,
+        "orderByColumn": "createdAt",
+        "orderByDirection": "DESC"
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e2101e55-9d1a-45e2-9360-5cb7d09bce03",
+      "name": "Build Dashboard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Builds the admin dashboard data: every clinic with links, contacts and request counts.\nconst cl = $('Get All Clinics').all().map(i => i.json).filter(x => x.clinic_id);\nconst intakes = {}; $('Get All Intakes').all().forEach(i => { if (i.json.id) intakes[i.json.id] = i.json; });\nconst rq = $('Get All Requests').all().map(i => i.json).filter(x => x.clinic_id);\nconst clinics = cl.map(x => { const it = intakes[x.intake_id] || {}; const f = String(x.features || 'chat'); return {\n  c: x.clinic_id, name: x.clinic_name, package: x.package || 'pilot', features: f, enabled: x.enabled, alert_clinic: x.alert_clinic, whatsapp_status: x.whatsapp_status || '', status: x.status, created: x.createdAt,\n  contact: it.contact_name || '', email: it.contact_email || '', phone: String(it.contact_phone || x.clinic_phone || '').replace(/\\D/g, ''),\n  chat_url: x.chat_url, site_url: f.includes('website') ? 'https://askhalora.com/site/?c=' + x.clinic_id : '',\n  portal_url: x.portal_key ? 'https://askhalora.com/portal/?c=' + x.clinic_id + '&k=' + x.portal_key : '',\n  agent: /^agent_/.test(x.phone_agent_id || '') ? x.phone_agent_id : '',\n  requests: rq.filter(r => r.clinic_id === x.clinic_id).length, new_requests: rq.filter(r => r.clinic_id === x.clinic_id && r.status === 'new').length\n}; }).sort((a, b) => String(b.created).localeCompare(String(a.created)));\nconst requests = rq.slice(0, 60).map(r => ({ at: r.createdAt, clinic: r.clinic_name, name: r.patient_name, phone: r.patient_phone, service: r.service, time: r.preferred_time, status: r.status, via: r.session === 'phone' ? 'phone' : 'chat' }));\nreturn [{ json: { ok: true, clinics, requests } }];"
+      }
+    },
+    {
+      "id": "352c027b-d28c-4844-a38e-29f6a8484eb5",
+      "name": "Reply Dashboard",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      }
+    },
+    {
+      "id": "df0ca6eb-a215-4753-8c91-a6d0283622ed",
+      "name": "Prepare Change",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "jsCode": "// Outputs only the one column to change, so nothing else is overwritten.\nconst j = $input.first().json; const o = {}; o[j.field] = j.value; return [{ json: o }];"
+      }
+    },
+    {
+      "id": "97ca4097-bc5c-43ef-a5cf-20a6160b61c8",
+      "name": "Update Clinic",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "clinic_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Check Key').item.json.c }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": [
+            {
+              "id": "enabled",
+              "displayName": "enabled",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "alert_clinic",
+              "displayName": "alert_clinic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "whatsapp_status",
+              "displayName": "whatsapp_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "9c60ab9f-280d-4541-9338-78945c29fb2f",
+      "name": "Reply Saved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":true}"
+      }
+    },
+    {
+      "id": "563217dc-4287-44b6-9a1f-25f47b989c18",
+      "name": "Reply Denied",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        896,
+        384
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":false}",
+        "options": {
+          "responseCode": 403
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Admin Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Admin Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Admin Key": {
+      "main": [
+        [
+          {
+            "node": "Check Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Key": {
+      "main": [
+        [
+          {
+            "node": "Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route": {
+      "main": [
+        [
+          {
+            "node": "Get All Clinics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Change",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Denied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Clinics": {
+      "main": [
+        [
+          {
+            "node": "Get All Intakes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Intakes": {
+      "main": [
+        [
+          {
+            "node": "Get All Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Requests": {
+      "main": [
+        [
+          {
+            "node": "Build Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Reply Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Change": {
+      "main": [
+        [
+          {
+            "node": "Update Clinic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Clinic": {
+      "main": [
+        [
+          {
+            "node": "Reply Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

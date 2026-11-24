@@ -1,0 +1,1947 @@
+{
+  "name": "Noor – Follow-ups, Reminders and Reviews",
+  "nodes": [
+    {
+      "id": "f257870b-2f1d-411e-a081-2b297bd3cacc",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1,
+              "triggerAtMinute": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4c89b52d-3840-4fec-8207-462359d91349",
+      "name": "Read Patients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "options": {}
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "b4f896e8-53fe-4d09-a684-6577c4d574c0",
+      "name": "Plan Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// TEST_MODE: 1 \"hour\" = 1 minute, 1 \"day\" = 1 minute, appointments last 2 minutes.\n// Real timings. Set to true only for quick tests (and run the schedule every 2 minutes).\nconst TEST_MODE = false;\nconst HOUR = TEST_MODE ? 60 * 1000 : 60 * 60 * 1000;\nconst DAY = TEST_MODE ? 60 * 1000 : 24 * 60 * 60 * 1000;\nconst APPT_LENGTH = TEST_MODE ? 2 * 60 * 1000 : 30 * 60 * 1000;\nconst FOLLOWUP_AFTER = [1 * DAY, 3 * DAY, 7 * DAY];\nconst RECALL_DAYS = 180; // 6-month check-up reminder\nconst AFTERCARE = /fill|root|canal|extract|implant|surg|wisdom|whiten|crown|حشو|عصب|خلع|زراع|تبييض|جراح/i;\n\n// Switches (Noor Settings): satisfaction_check, recall_reminders, missed_appointment, reminder_3d, first_visit_tips, aftercare_checkin, win_back.\nconst on = {};\ntry { $('Get Switches').all().forEach(function (i) { const r = i.json || {}; if (r.feature) on[String(r.feature).trim()] = String(r.enabled).trim().toUpperCase() === 'TRUE'; }); } catch (e) { /* off */ }\n// Messages already sent (noor_sent_log), so nothing goes out twice.\nconst sent = {};\ntry { $('Get Sent Log').all().forEach(function (i) { const r = i.json || {}; if (r.phone && r.kind) sent[String(r.phone) + '|' + r.kind + '|' + String(r.ref || '')] = true; }); } catch (e) { /* none */ }\nconst was = function (p, k, ref) { return !!sent[String(p) + '|' + k + '|' + String(ref || '')]; };\n\nconst now = DateTime.now().setZone('Asia/Dubai');\nconst inDay = TEST_MODE || (now.hour >= 10 && now.hour < 19);\nconst out = [];\n\nfor (const item of $('Read Patients').all()) {\n  const r = item.json;\n  if (!r.phone) continue;\n  if (/^000000000000/.test(String(r.phone))) continue; // test numbers never get messages\n  const lang = String(r.language || '').toLowerCase().startsWith('ar') ? 'ar' : 'en';\n  const firstName = String(r.name || '').trim().split(' ')[0] || (lang === 'ar' ? 'عزيزنا' : 'there');\n  const service = String(r.service || (lang === 'ar' ? 'الأسنان' : 'dental'));\n  const status = String(r.status || '').toLowerCase().trim();\n  if (status === 'opted_out') continue; // the patient replied STOP\n  const row = {\n    phone: String(r.phone),\n    status: r.status || '',\n    followups_sent: Number(r.followups_sent || 0),\n    reminder_24h_sent: r.reminder_24h_sent || '',\n    reminder_2h_sent: r.reminder_2h_sent || '',\n    review_requested: r.review_requested || ''\n  };\n\n  // 1) Appointment reminders, first-visit tips, review requests / satisfaction check\n  if ((status === 'booked' || status === 'confirmed') && r.appointment_start) {\n    const start = DateTime.fromFormat(String(r.appointment_start), 'yyyy-MM-dd HH:mm', { zone: 'Asia/Dubai' });\n    if (start.isValid) {\n      const msUntil = start.toMillis() - now.toMillis();\n      // Flags store the appointment time they were sent for, so a new booking gets fresh reminders.\n      const key = String(r.appointment_start);\n      const local = start.reconfigure({ locale: lang, numberingSystem: 'latn' });\n      const dateText = local.toFormat('cccc d LLLL');\n      const timeText = lang === 'ar'\n        ? start.toFormat('h:mm') + (start.hour < 12 ? ' صباحاً' : ' مساءً')\n        : start.toFormat('h:mm a');\n      const when = lang === 'ar' ? dateText + ' الساعة ' + timeText : dateText + ' at ' + timeText;\n\n      if (msUntil > 0 && msUntil <= 2 * HOUR && row.reminder_2h_sent !== key) {\n        out.push({ json: { ...row, reminder_2h_sent: key, reminder_24h_sent: key, action: 'reminder', template: 'appointment_reminder|' + lang, p1: firstName, p2: service, p3: dateText, p4: timeText } });\n        continue;\n      }\n      if (msUntil > 2 * HOUR && msUntil <= 24 * HOUR && row.reminder_24h_sent !== key) {\n        out.push({ json: { ...row, reminder_24h_sent: key, action: 'reminder', template: 'appointment_reminder|' + lang, p1: firstName, p2: service, p3: dateText, p4: timeText } });\n        continue;\n      }\n      // 2-4 days before: new patients get first-visit tips, returning patients the 3-day reminder (10:00-19:00, once)\n      if (msUntil > 2 * DAY && msUntil <= 4 * DAY && inDay) {\n        const isNew = /new|جديد/i.test(String(r.new_or_returning || ''));\n        if (isNew && on.first_visit_tips && !was(row.phone, 'first_visit', key)) {\n          out.push({ json: { ...row, action: 'tips', template: 'first_visit_tips|' + lang, p1: firstName, p2: when, log_kind: 'first_visit', log_ref: key } });\n          continue;\n        }\n        if (!isNew && on.reminder_3d && !was(row.phone, 'reminder_3d', key)) {\n          const dentist = String(r.dentist || (lang === 'ar' ? 'طبيبك' : 'your dentist'));\n          out.push({ json: { ...row, action: 'reminder3d', template: 'appointment_reminder_3d|' + lang, p1: firstName, p2: service, p3: when, p4: dentist, log_kind: 'reminder_3d', log_ref: key } });\n          continue;\n        }\n      }\n      const reviewAt = start.toMillis() + APPT_LENGTH + HOUR;\n      if (now.toMillis() >= reviewAt && row.review_requested !== key) {\n        if (on.satisfaction_check) {\n          const dentist = String(r.dentist || (lang === 'ar' ? 'طبيبك' : 'your dentist'));\n          out.push({ json: { ...row, status: 'completed', review_requested: key, action: 'feedback', template: 'visit_feedback|' + lang, p1: firstName, p2: dentist } });\n        } else {\n          out.push({ json: { ...row, status: 'completed', review_requested: key, action: 'review', template: 'review_request|' + lang, p1: firstName } });\n        }\n        continue;\n      }\n    }\n  }\n\n  // 2) Follow-ups for leads who have not booked (8:00-20:00 Dubai time only)\n  if (status === 'lead' && row.followups_sent < 3 && r.last_message_at) {\n    const last = DateTime.fromFormat(String(r.last_message_at), 'yyyy-MM-dd HH:mm', { zone: 'Asia/Dubai' });\n    const inHours = TEST_MODE || (now.hour >= 8 && now.hour < 20);\n    if (last.isValid && inHours && now.toMillis() - last.toMillis() >= FOLLOWUP_AFTER[row.followups_sent]) {\n      const sentCount = row.followups_sent + 1;\n      out.push({ json: { ...row, followups_sent: sentCount, status: sentCount >= 3 ? 'no_reply' : 'lead', action: 'followup', template: 'booking_followup|' + lang, p1: firstName, p2: service } });\n    }\n    continue;\n  }\n\n  // 3) No-show: the team sets status to no_show in the Patients tab (10:00-19:00 only)\n  if (status === 'no_show' && on.missed_appointment && inDay) {\n    out.push({ json: { ...row, status: 'no_show_contacted', action: 'missed', template: 'missed_appointment|' + lang, p1: firstName, p2: service } });\n    continue;\n  }\n\n  if (status === 'completed' && inDay && r.appointment_start) {\n    const visit = DateTime.fromFormat(String(r.appointment_start), 'yyyy-MM-dd HH:mm', { zone: 'Asia/Dubai' });\n    if (visit.isValid) {\n      // 4) Aftercare check-in 20-48 hours after a treatment (not after a simple check-up or cleaning)\n      const hrs = now.diff(visit, 'hours').hours;\n      if (on.aftercare_checkin && AFTERCARE.test(service) && hrs >= 20 && hrs <= 48 && !was(row.phone, 'aftercare', r.appointment_start)) {\n        out.push({ json: { ...row, action: 'aftercare', template: 'aftercare_checkin|' + lang, p1: firstName, p2: service, log_kind: 'aftercare', log_ref: String(r.appointment_start) } });\n        continue;\n      }\n      // 5) 6-month recall after a completed visit (once)\n      const days = now.diff(visit, 'days').days;\n      if (on.recall_reminders && days >= RECALL_DAYS && days < RECALL_DAYS + 60) {\n        out.push({ json: { ...row, status: 'recall_sent', action: 'recall', template: 'recall_reminder|' + lang, p1: firstName } });\n        continue;\n      }\n    }\n  }\n\n  // 6) Win-back: leads who never answered the 3 follow-ups, 60-120 days later (once)\n  if (status === 'no_reply' && on.win_back && inDay && r.last_message_at && !was(row.phone, 'win_back', '')) {\n    const last = DateTime.fromFormat(String(r.last_message_at), 'yyyy-MM-dd HH:mm', { zone: 'Asia/Dubai' });\n    const days = last.isValid ? now.diff(last, 'days').days : -1;\n    if (days >= 60 && days < 120) {\n      out.push({ json: { ...row, action: 'winback', template: 'win_back|' + lang, p1: firstName, log_kind: 'win_back', log_ref: '' } });\n      continue;\n    }\n  }\n}\n\n// What Noor remembers about each automatic message, so she understands replies like \"Confirm\", \"YES\" or a day.\nfunction hist(j) {\n  switch (j.action) {\n    case 'reminder': return '[Noor sent an automatic appointment reminder: ' + j.p2 + ' on ' + j.p3 + ' at ' + j.p4 + ', with Confirm and Reschedule buttons]';\n    case 'reminder3d': return '[Noor sent an automatic reminder 3 days before: ' + j.p2 + ' on ' + j.p3 + ' with ' + j.p4 + '; asked them to reply YES to confirm or CHANGE to pick another time]';\n    case 'tips': return '[Noor sent a welcome message for their first visit on ' + j.p2 + ': arrive 10 minutes early, bring the insurance card, free parking]';\n    case 'followup': return '[Noor sent an automatic follow-up asking if they still want to book their ' + j.p2 + ', with Book now and Not now buttons]';\n    case 'review': return '[Noor sent an automatic thank-you after the visit asking for a Google review; if anything was not right they can reply and the manager will contact them]';\n    case 'feedback': return '[Noor sent an automatic message asking them to rate their visit with ' + j.p2 + ' from 1 (poor) to 5 (excellent)]';\n    case 'missed': return '[Noor sent an automatic message: they missed their ' + j.p2 + ' appointment today; asked if they would like a new time]';\n    case 'aftercare': return '[Noor sent an aftercare check-in asking how they feel after their ' + j.p2 + '. If they report severe pain, swelling or bleeding that will not stop, tell them to call the clinic right away and alert the staff]';\n    case 'recall': return '[Noor sent an automatic 6-month check-up and cleaning reminder; asked them to reply with a day that suits them]';\n    case 'winback': return '[Noor sent a win-back message asking if they would like to book a check-up; they can reply STOP to opt out]';\n    default: return '[Noor sent an automatic message]';\n  }\n}\nout.forEach(function (o) { o.json.history_text = hist(o.json); if (!o.json.log_kind) { o.json.log_kind = o.json.action; o.json.log_ref = String(r0(o.json)); } });\nfunction r0(j) { return j.reminder_2h_sent || j.reminder_24h_sent || j.review_requested || ''; }\nreturn out;\n"
+      }
+    },
+    {
+      "id": "da68ab71-8236-4e43-b412-641121211d26",
+      "name": "Which Message?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        672,
+        176
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "regex",
+                      "type": "string"
+                    },
+                    "rightValue": "^(reminder|reminder3d)$"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "reminder",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "followup"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "followup",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "review"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "review",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "feedback"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "feedback",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "regex",
+                      "type": "string"
+                    },
+                    "rightValue": "^(recall|winback)$"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "one value",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "regex",
+                      "type": "string"
+                    },
+                    "rightValue": "^(missed|tips|aftercare)$"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "two values",
+              "renameOutput": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "48d1b336-482e-443e-8ee7-2d900fbadfb4",
+      "name": "Send Reminder",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "template": "={{ $json.template }}",
+        "components": {
+          "component": [
+            {
+              "type": "body",
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "type": "text",
+                    "text": "={{ $json.p1 }}"
+                  },
+                  {
+                    "type": "text",
+                    "text": "={{ $json.p2 }}"
+                  },
+                  {
+                    "type": "text",
+                    "text": "={{ $json.p3 }}"
+                  },
+                  {
+                    "type": "text",
+                    "text": "={{ $json.p4 }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "c79b7f87-9398-4fd6-b706-6f78a732b780",
+      "name": "Update Patient Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "value": {
+            "phone": "={{ $('Plan Messages').item.json.phone }}",
+            "status": "={{ $('Plan Messages').item.json.status }}",
+            "followups_sent": "={{ $('Plan Messages').item.json.followups_sent }}",
+            "reminder_24h_sent": "={{ $('Plan Messages').item.json.reminder_24h_sent }}",
+            "reminder_2h_sent": "={{ $('Plan Messages').item.json.reminder_2h_sent }}",
+            "review_requested": "={{ $('Plan Messages').item.json.review_requested }}"
+          },
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "followups_sent",
+              "displayName": "followups_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reminder_24h_sent",
+              "displayName": "reminder_24h_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reminder_2h_sent",
+              "displayName": "reminder_2h_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "review_requested",
+              "displayName": "review_requested",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "1572fa31-bc55-491b-bc51-1ec78546bbd5",
+      "name": "Send Follow-up",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "template": "={{ $json.template }}",
+        "components": {
+          "component": [
+            {
+              "type": "body",
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "type": "text",
+                    "text": "={{ $json.p1 }}"
+                  },
+                  {
+                    "type": "text",
+                    "text": "={{ $json.p2 }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "938aa587-797b-402d-9109-017a981708aa",
+      "name": "Send Review Request",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        384
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "template": "={{ $json.template }}",
+        "components": {
+          "component": [
+            {
+              "type": "body",
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "type": "text",
+                    "text": "={{ $json.p1 }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "a7714872-9ffe-42b4-a630-0658cf09bb7d",
+      "name": "Read Family Bookings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        640
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "read",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "d41e4a49-3085-4abe-8d5e-6cb654f99b53",
+      "name": "Read Patients (Family)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        640
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "read",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "dc152761-7fc4-4acc-ae86-5ba791bc2f54",
+      "name": "Family Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        640
+      ],
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "getAll",
+        "options": {
+          "orderBy": "startTime",
+          "recurringEventHandling": "expand"
+        },
+        "resource": "event",
+        "returnAll": true,
+        "timeMax": "={{ $now.plus({ days: 2 }).toISO() }}",
+        "timeMin": "={{ $now.minus({ days: 1 }).toISO() }}"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "7b021a9a-1447-4152-a18d-8288261b9370",
+      "name": "Plan Family Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        640
+      ],
+      "parameters": {
+        "jsCode": "// Reminders (24h and 2h) and review requests for family bookings (Family Bookings tab).\n// A family booking whose calendar event was deleted is marked cancelled instead of reminded.\nconst Z = 'Asia/Dubai';\nconst HOUR = 60 * 60 * 1000;\nconst now = DateTime.now().setZone(Z);\nconst lang = {};\n$('Read Patients (Family)').all().forEach(function (i) { const r = i.json || {}; if (r.phone) lang[String(r.phone).replace(/\\D/g, '')] = String(r.language || '').toLowerCase().startsWith('ar') ? 'ar' : 'en'; });\nconst live = {};\n$('Family Events').all().forEach(function (i) { const e = i.json || {}; if (e.id && e.status !== 'cancelled') live[e.id] = true; });\nconst out = [];\nfor (const it of $('Read Family Bookings').all()) {\n  const r = it.json || {};\n  if (!r.key || !r.phone || !r.appointment_start) continue;\n  if (String(r.status || '').toLowerCase() !== 'booked') continue;\n  const phone = String(r.phone).replace(/\\D/g, '');\n  if (/^000000000000/.test(phone)) continue;\n  const start = DateTime.fromFormat(String(r.appointment_start), 'yyyy-MM-dd HH:mm', { zone: Z });\n  if (!start.isValid) continue;\n  const ms = start.toMillis() - now.toMillis();\n  const l = lang[phone] || 'en';\n  const first = String(r.name || '').trim().split(' ')[0] || (l === 'ar' ? 'عزيزنا' : 'there');\n  const service = String(r.service || (l === 'ar' ? 'الأسنان' : 'dental'));\n  const key = String(r.appointment_start);\n  const local = start.reconfigure({ locale: l, numberingSystem: 'latn' });\n  const dateText = local.toFormat('cccc d LLLL');\n  const timeText = l === 'ar' ? start.toFormat('h:mm') + (start.hour < 12 ? ' صباحاً' : ' مساءً') : start.toFormat('h:mm a');\n  const base = { key: String(r.key), phone: phone, status: String(r.status || 'booked'), reminder_24h_sent: String(r.reminder_24h_sent || ''), reminder_2h_sent: String(r.reminder_2h_sent || ''), review_requested: String(r.review_requested || '') };\n  if (ms > 0 && ms <= 48 * HOUR && !live[r.key]) { out.push({ json: Object.assign({}, base, { status: 'cancelled', action: 'none' }) }); continue; }\n  if (ms > 0 && ms <= 2 * HOUR && base.reminder_2h_sent !== key) {\n    out.push({ json: Object.assign({}, base, { reminder_2h_sent: key, reminder_24h_sent: key, action: 'reminder', template: 'appointment_reminder|' + l, p1: first, p2: service, p3: dateText, p4: timeText }) });\n    continue;\n  }\n  if (ms > 2 * HOUR && ms <= 24 * HOUR && base.reminder_24h_sent !== key) {\n    out.push({ json: Object.assign({}, base, { reminder_24h_sent: key, action: 'reminder', template: 'appointment_reminder|' + l, p1: first, p2: service, p3: dateText, p4: timeText }) });\n    continue;\n  }\n  const reviewAt = start.toMillis() + 90 * 60 * 1000;\n  if (now.toMillis() >= reviewAt && now.toMillis() - reviewAt < 48 * HOUR && base.review_requested !== key) {\n    out.push({ json: Object.assign({}, base, { status: 'completed', review_requested: key, action: 'review', template: 'review_request|' + l, p1: first }) });\n  }\n}\nreturn out;\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "0acd9baf-494a-41b8-8f28-c8d2ba392bf5",
+      "name": "Family Message?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        640
+      ],
+      "parameters": {
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "update only"
+        },
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "reminder"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "reminder",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "review"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "review",
+              "renameOutput": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "824b73fd-f6f0-477a-831d-9b9d15eb4488",
+      "name": "Send Family Reminder",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        560
+      ],
+      "parameters": {
+        "components": {
+          "component": [
+            {
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "text": "={{ $json.p1 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p2 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p3 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p4 }}",
+                    "type": "text"
+                  }
+                ]
+              },
+              "type": "body"
+            }
+          ]
+        },
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "resource": "message",
+        "template": "={{ $json.template }}"
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "11e70696-4cfd-4b62-9c3e-9cc752cadd0c",
+      "name": "Send Family Review",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        720
+      ],
+      "parameters": {
+        "components": {
+          "component": [
+            {
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "text": "={{ $json.p1 }}",
+                    "type": "text"
+                  }
+                ]
+              },
+              "type": "body"
+            }
+          ]
+        },
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "resource": "message",
+        "template": "={{ $json.template }}"
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "db087f06-1a08-4834-a343-cc706c4139a9",
+      "name": "Update Family Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        640
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "key"
+          ],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "key",
+              "id": "key",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "reminder_24h_sent",
+              "id": "reminder_24h_sent",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "reminder_2h_sent",
+              "id": "reminder_2h_sent",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "review_requested",
+              "id": "review_requested",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "key": "={{ $('Plan Family Messages').item.json.key }}",
+            "reminder_24h_sent": "={{ $('Plan Family Messages').item.json.reminder_24h_sent }}",
+            "reminder_2h_sent": "={{ $('Plan Family Messages').item.json.reminder_2h_sent }}",
+            "review_requested": "={{ $('Plan Family Messages').item.json.review_requested }}",
+            "status": "={{ $('Plan Family Messages').item.json.status }}"
+          }
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "appendOrUpdate",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "01ddd3b8-cbec-4a77-9ac4-7edc1c6f2d14",
+      "name": "Get Switches",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        320
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "8fd2e2cd-6dda-445f-9e32-d1a01406cd88",
+      "name": "Send Feedback Request",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        560
+      ],
+      "parameters": {
+        "components": {
+          "component": [
+            {
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "text": "={{ $json.p1 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p2 }}",
+                    "type": "text"
+                  }
+                ]
+              },
+              "type": "body"
+            }
+          ]
+        },
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "resource": "message",
+        "template": "={{ $json.template }}"
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "28090f48-3bae-4709-87b9-112786f9195e",
+      "name": "Send Recall",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        760
+      ],
+      "parameters": {
+        "components": {
+          "component": [
+            {
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "text": "={{ $json.p1 }}",
+                    "type": "text"
+                  }
+                ]
+              },
+              "type": "body"
+            }
+          ]
+        },
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "resource": "message",
+        "template": "={{ $json.template }}"
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "90705679-603a-468a-bc6b-d90601e8fc16",
+      "name": "Send Missed",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        920
+      ],
+      "parameters": {
+        "components": {
+          "component": [
+            {
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "text": "={{ $json.p1 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p2 }}",
+                    "type": "text"
+                  }
+                ]
+              },
+              "type": "body"
+            }
+          ]
+        },
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "resource": "message",
+        "template": "={{ $json.template }}"
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "94700efa-0291-4d67-a521-37cae41b35cf",
+      "name": "Save To Noor History",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        420
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "role",
+              "id": "role",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "text",
+              "id": "text",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "intents",
+              "id": "intents",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "intents": "automatic",
+            "phone": "={{ $('Plan Messages').item.json.phone }}",
+            "role": "noor",
+            "text": "={{ $('Plan Messages').item.json.history_text }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "015eed01-2d50-4548-a2b5-79d8701f5924",
+      "name": "Upcoming Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        1100
+      ],
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "getAll",
+        "options": {
+          "orderBy": "startTime",
+          "recurringEventHandling": "expand"
+        },
+        "resource": "event",
+        "returnAll": true,
+        "timeMax": "={{ $now.plus({ days: 14 }).toISO() }}",
+        "timeMin": "={{ $now.toISO() }}"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "ba522c83-d113-465b-aadf-bb5172d1b3a8",
+      "name": "Get Slot Snapshot",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        1100
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "b9b527ef-e0ca-4893-a831-087c5a05a596",
+      "name": "Read Requests",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        1100
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "read",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "62597b66-3283-489e-947f-84e1f96f917a",
+      "name": "Plan Slot Offers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        1100
+      ],
+      "parameters": {
+        "jsCode": "// Finds appointments cancelled or moved since the last hourly check and offers the freed time\n// to patients on the waitlist (slot_available template). Switch: slot_offers.\nconst Z = 'Asia/Dubai';\nconst now = DateTime.now().setZone(Z);\nconst on = {};\ntry { $('Get Switches').all().forEach(function (i) { const r = i.json || {}; if (r.feature) on[String(r.feature).trim()] = String(r.enabled).trim().toUpperCase() === 'TRUE'; }); } catch (e) { /* off */ }\nconst events = $('Upcoming Events').all().map(function (i) { return i.json || {}; }).filter(function (e) { return e.id && e.start && e.start.dateTime && e.status !== 'cancelled'; });\nconst current = {};\nevents.forEach(function (e) { current[e.id] = DateTime.fromISO(e.start.dateTime, { zone: Z }).toMillis(); });\nconst snap = $('Get Slot Snapshot').all().map(function (i) { return i.json || {}; }).filter(function (r) { return r.event_id; });\nconst control = function (ok) { return [{ json: { action: 'snapshot', ok: ok } }]; };\nif (!events.length && snap.length >= 3) return control(false); // calendar read probably failed: change nothing\nif (!on.slot_offers || !snap.length) return control(true);\nif (now.hour < 9 || now.hour >= 20) return control(false); // offer in the morning instead\nconst freed = [];\nsnap.forEach(function (r) {\n  const s = DateTime.fromISO(String(r.start), { zone: Z });\n  if (!s.isValid) return;\n  if (current[r.event_id] === s.toMillis()) return; // still booked at the same time\n  if (s < now.plus({ hours: 3 }) || s > now.plus({ days: 14 })) return;\n  freed.push({ start: s, summary: String(r.summary || '') });\n});\nif (!freed.length) return control(true);\nconst lang = {};\nconst names = {};\ntry { $('Read Patients').all().forEach(function (i) { const r = i.json || {}; const p = String(r.phone || '').replace(/\\D/g, ''); if (!p) return; lang[p] = String(r.language || '').toLowerCase().startsWith('ar') ? 'ar' : 'en'; names[p] = String(r.name || '').trim().split(' ')[0]; }); } catch (e) { /* defaults */ }\nconst waiting = $('Read Requests').all().map(function (i) { return i.json || {}; }).filter(function (r) {\n  if (!r.key || !r.phone || !/wait/i.test(String(r.type || ''))) return false;\n  const st = String(r.status || '').toLowerCase().trim();\n  if (st && st !== 'open' && st !== 'new') return false;\n  if (/^000000000000/.test(String(r.phone).replace(/\\D/g, ''))) return false;\n  const t = DateTime.fromFormat(String(r.time || ''), 'yyyy-MM-dd HH:mm', { zone: Z });\n  return !(t.isValid && now.diff(t, 'days').days > 14);\n}).sort(function (a, b) { return String(a.time || '').localeCompare(String(b.time || '')); });\nconst out = [];\nconst used = {};\nfreed.slice(0, 2).forEach(function (f) {\n  let n = 0;\n  waiting.forEach(function (w) {\n    if (n >= 3 || used[w.key]) return;\n    const p = String(w.phone).replace(/\\D/g, '');\n    const l = lang[p] || 'en';\n    const when = l === 'ar'\n      ? f.start.reconfigure({ locale: 'ar', numberingSystem: 'latn' }).toFormat('cccc d LLLL') + ' الساعة ' + f.start.toFormat('h:mm') + (f.start.hour < 12 ? ' صباحاً' : ' مساءً')\n      : f.start.toFormat('cccc d LLLL') + ' at ' + f.start.toFormat('h:mm a');\n    used[w.key] = 1;\n    n++;\n    out.push({ json: {\n      action: 'slot', key: String(w.key), phone: p, template: 'slot_available|' + l,\n      p1: names[p] || (l === 'ar' ? 'عزيزنا' : 'there'), p2: l === 'ar' ? 'أسنان' : 'dental', p3: when,\n      note: 'Offered the freed slot ' + f.start.toFormat('yyyy-MM-dd HH:mm') + ' (' + f.summary + ')',\n      updated_at: now.toFormat('yyyy-MM-dd HH:mm'),\n      history_text: '[Noor sent an automatic waitlist message: a slot opened on ' + f.start.toFormat('cccc d LLLL') + ' at ' + f.start.toFormat('h:mm a') + ' (Dubai time); asked them to reply YES to take it. If they say yes, check it is still free with find_free_slots and book it]'\n    } });\n  });\n});\nreturn out.concat(control(true));\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "e75ecb4f-a157-4975-86c4-144bdf287cc1",
+      "name": "Slot Route",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        1100
+      ],
+      "parameters": {
+        "looseTypeValidation": true,
+        "options": {},
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "slot"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "offer",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action === 'snapshot' && $json.ok === true }}",
+                    "operator": {
+                      "operation": "true",
+                      "singleValue": true,
+                      "type": "boolean"
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "snapshot",
+              "renameOutput": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ce4dc0f5-17ef-46ed-b1d5-833441dfdb65",
+      "name": "Send Slot Offer",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        1000
+      ],
+      "parameters": {
+        "components": {
+          "component": [
+            {
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "text": "={{ $json.p1 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p2 }}",
+                    "type": "text"
+                  },
+                  {
+                    "text": "={{ $json.p3 }}",
+                    "type": "text"
+                  }
+                ]
+              },
+              "type": "body"
+            }
+          ]
+        },
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "resource": "message",
+        "template": "={{ $json.template }}"
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "8237fe4c-6d59-4934-9df8-253d1349f42f",
+      "name": "Mark Request Offered",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1568,
+        940
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "key"
+          ],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "key",
+              "id": "key",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "note",
+              "id": "note",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "updated_at",
+              "id": "updated_at",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "key": "={{ $('Plan Slot Offers').item.json.key }}",
+            "note": "={{ $('Plan Slot Offers').item.json.note }}",
+            "status": "slot offered",
+            "updated_at": "={{ $('Plan Slot Offers').item.json.updated_at }}"
+          }
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "appendOrUpdate",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6e0cff81-5c05-447f-9c70-f1ebcd0bc43c",
+      "name": "Save Slot History",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        1060
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "role",
+              "id": "role",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "text",
+              "id": "text",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "intents",
+              "id": "intents",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "intents": "automatic",
+            "phone": "={{ $('Plan Slot Offers').item.json.phone }}",
+            "role": "noor",
+            "text": "={{ $('Plan Slot Offers').item.json.history_text }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b1a4fe32-534f-4ec2-be56-27d1ff63d33d",
+      "name": "Clear Snapshot",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        1200
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "isNotEmpty",
+              "keyName": "event_id"
+            }
+          ]
+        },
+        "matchType": "anyCondition",
+        "operation": "deleteRows",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "e722d639-b80a-4529-8be7-bcb8b63dd2f0",
+      "name": "Snapshot Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        1200
+      ],
+      "parameters": {
+        "jsCode": "// The calendar as it is now, so the next hourly run can spot cancelled or moved appointments.\nreturn $('Upcoming Events').all().map(function (i) { return i.json || {}; })\n  .filter(function (e) { return e.id && e.start && e.start.dateTime && e.status !== 'cancelled'; })\n  .map(function (e) { return { json: { event_id: String(e.id), start: String(e.start.dateTime), summary: String(e.summary || '').slice(0, 200) } }; });\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "b055bda6-0c0d-40d1-9641-5a0ec8131dae",
+      "name": "Save Snapshot",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        1200
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "event_id",
+              "id": "event_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "start",
+              "id": "start",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "summary",
+              "id": "summary",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "start": "={{ $json.start }}",
+            "summary": "={{ $json.summary }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "7170c0e2-f532-49c1-9eb1-0f495fac57fe",
+      "name": "Get Sent Log",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        336,
+        80
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "825b0c02-9f1c-468b-bc5f-2c671b692546",
+      "name": "Log Sent",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        420
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "kind",
+              "id": "kind",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "ref",
+              "id": "ref",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "sent_at",
+              "id": "sent_at",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "kind": "={{ $('Plan Messages').item.json.log_kind }}",
+            "phone": "={{ $('Plan Messages').item.json.phone }}",
+            "ref": "={{ $('Plan Messages').item.json.log_ref }}",
+            "sent_at": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Plan Messages": {
+      "main": [
+        [
+          {
+            "node": "Which Message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Which Message?": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Review Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Feedback Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Recall",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Missed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update Patient Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save To Noor History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Update Patient Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save To Noor History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Review Request": {
+      "main": [
+        [
+          {
+            "node": "Update Patient Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save To Noor History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Read Family Bookings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Switches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Family Bookings": {
+      "main": [
+        [
+          {
+            "node": "Read Patients (Family)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Patients (Family)": {
+      "main": [
+        [
+          {
+            "node": "Family Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Family Events": {
+      "main": [
+        [
+          {
+            "node": "Plan Family Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Family Messages": {
+      "main": [
+        [
+          {
+            "node": "Family Message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Family Message?": {
+      "main": [
+        [
+          {
+            "node": "Send Family Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Family Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Family Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Family Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update Family Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Family Review": {
+      "main": [
+        [
+          {
+            "node": "Update Family Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Switches": {
+      "main": [
+        [
+          {
+            "node": "Read Patients",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upcoming Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Feedback Request": {
+      "main": [
+        [
+          {
+            "node": "Update Patient Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save To Noor History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Recall": {
+      "main": [
+        [
+          {
+            "node": "Update Patient Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save To Noor History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Missed": {
+      "main": [
+        [
+          {
+            "node": "Update Patient Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save To Noor History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upcoming Events": {
+      "main": [
+        [
+          {
+            "node": "Get Slot Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Slot Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Read Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Requests": {
+      "main": [
+        [
+          {
+            "node": "Plan Slot Offers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Slot Offers": {
+      "main": [
+        [
+          {
+            "node": "Slot Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot Route": {
+      "main": [
+        [
+          {
+            "node": "Send Slot Offer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Slot Offer": {
+      "main": [
+        [
+          {
+            "node": "Mark Request Offered",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Slot History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Snapshot Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Snapshot Rows": {
+      "main": [
+        [
+          {
+            "node": "Save Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Patients": {
+      "main": [
+        [
+          {
+            "node": "Get Sent Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sent Log": {
+      "main": [
+        [
+          {
+            "node": "Plan Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save To Noor History": {
+      "main": [
+        [
+          {
+            "node": "Log Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

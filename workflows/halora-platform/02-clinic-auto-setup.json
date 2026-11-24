@@ -1,0 +1,565 @@
+{
+  "name": "Halora – Clinic Auto-Setup",
+  "nodes": [
+    {
+      "id": "42c0ea1d-87df-4394-b955-883b48dbd2a4",
+      "name": "Setup Request",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "intake_id",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7f1b4432-7763-4e52-8619-c8cba4f3532e",
+      "name": "Get Intake",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.intake_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      }
+    },
+    {
+      "id": "f29811b1-c18f-48e2-bf68-3922317e12aa",
+      "name": "Build Clinic Assistant",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Turns one setup-form submission into a ready clinic assistant (prompt, link, embed code).\nconst row = $input.first().json;\nlet b = {};\ntry { b = JSON.parse(row.payload_json || '{}'); } catch (e) { b = {}; }\nconst s = v => String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, 600);\nconst list = v => Array.isArray(v) ? v.slice(0, 80) : [];\nconst name = s(b.clinic_name || row.clinic_name) || 'the clinic';\nconst assistant = s(b.assistant_name) || 'Noor';\nconst slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'clinic';\nconst token = Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6);\nconst clinic_id = slug + '-' + token;\nconst days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];\nconst hours = b.hours || {};\nconst hoursTxt = days.map(d => '- ' + d[0].toUpperCase() + d.slice(1) + ': ' + (s(hours[d]) || 'closed')).join('\\n');\nconst services = list(b.services).filter(x => x && s(x.name));\nconst cur = s(b.currency) || 'AED';\nconst svcTxt = services.map(x => '- ' + s(x.name) + (s(x.price) === '0' ? ': free' : s(x.price) ? ': ' + (x.from ? 'from ' : '') + s(x.price) + ' ' + cur : ': price on consultation') + (s(x.minutes) ? ' (' + s(x.minutes) + ' min)' : '') + (s(x.doctor) ? ' - ' + s(x.doctor) : '')).join('\\n') || '- (no services listed yet: offer to pass the question to the team)';\nconst docs = list(b.doctors).filter(x => x && s(x.name));\nconst docTxt = docs.map(x => '- ' + s(x.name) + (s(x.specialty) ? ', ' + s(x.specialty) : '') + (s(x.services) ? ' (' + s(x.services) + ')' : '') + (s(x.days) ? ', days: ' + s(x.days) : '') + (s(x.languages) ? ', speaks ' + s(x.languages) : '')).join('\\n') || '- (not listed)';\nconst faqs = list(b.faqs).filter(x => x && s(x.q));\nconst faqTxt = faqs.map(x => 'Q: ' + s(x.q) + '\\nA: ' + s(x.a)).join('\\n') || '(none)';\nconst extra = [['Address', b.address], ['Map link', b.map_link], ['Parking', b.parking], ['Payment', b.payment], ['Insurance', b.insurance], ['Policies', b.policies], ['Cancellation', b.late_cancel_hours ? 'please cancel at least ' + s(b.late_cancel_hours) + ' hours before' : ''], ['Closed dates', b.closed_dates], ['Website', b.website], ['Clinic phone', b.support_phone || b.clinic_whatsapp]].filter(x => s(x[1])).map(x => '- ' + x[0] + ': ' + s(x[1])).join('\\n');\nconst emergency = s(b.emergency_number) || '999';\nconst tone = s(b.tone) || 'warm, professional and brief';\nconst prompt = [\n  'You are ' + assistant + ', the AI receptionist of ' + name + (s(b.clinic_type) ? ' (' + s(b.clinic_type) + ' clinic)' : '') + '. You chat with patients on the clinic website.',\n  'Tone: ' + tone + '. Reply in the language the patient writes in (English or Arabic). Keep replies to 1-4 short sentences. No markdown headings.',\n  '', 'CLINIC FACTS (the only facts you may use):', extra, '', 'Opening hours:', hoursTxt, '', 'Services and prices:', svcTxt, '', 'Doctors:', docTxt, '', 'FAQs:', faqTxt, '',\n  'RULES:',\n  '- Only use the facts above. If something is not listed, say you will check with the team and offer to take their name and phone so the clinic can reply.',\n  '- Never diagnose or give medical advice. For severe pain, bleeding, swelling with fever or any emergency, tell them to call ' + emergency + ' or go to the nearest emergency room.',\n  '- Never ask for ID numbers, card or payment details, or medical history.',\n  '- You cannot see the live calendar. For appointments, collect: full name, phone number (WhatsApp), service, preferred day and time. Then tell them the clinic team will confirm the exact time shortly. Never say the booking is confirmed.',\n  '- When you have all four booking details for the first time, add this on a new line at the very end of your reply, exactly once: [[REQUEST]]{\"name\":\"...\",\"phone\":\"...\",\"service\":\"...\",\"time\":\"...\",\"note\":\"...\"}[[/REQUEST]]',\n  '- Prices are as listed; final price is confirmed by the doctor after examination.',\n  '- If asked, you are an AI assistant for the clinic, powered by Halora.'\n].join('\\n');\n\nconst pkg = s(b.plan) || 'front-desk';\nconst yes = v => String(v || '').toLowerCase() === 'yes';\nconst f = { chat: true, portal: true,\n  whatsapp: ['front-desk','front-desk-phone','group'].includes(pkg),\n  phone: ['front-desk-phone','group'].includes(pkg) || yes(b.addon_phone),\n  website: pkg === 'group' || yes(b.addon_website),\n  reminders: pkg === 'group' || yes(b.addon_reminders) };\nconst features = Object.keys(f).filter(k => f[k]).join(',');\nconst portal_key = [0,1,2].map(() => Math.random().toString(36).slice(2, 10)).join('');\nconst site = { name, type: s(b.clinic_type), assistant, address: s(b.address), map: s(b.map_link), parking: s(b.parking), phone: s(b.support_phone || b.clinic_whatsapp || b.contact_phone), whatsapp: String(b.clinic_whatsapp || '').replace(/\\D/g, ''), hours: days.map(d => [d, s(hours[d]) || 'closed']), services: services.map(x => ({ n: s(x.name), p: s(x.price), from: !!x.from, m: s(x.minutes) })), doctors: docs.map(x => ({ n: s(x.name), sp: s(x.specialty), d: s(x.days) })), faqs: faqs.map(x => ({ q: s(x.q), a: s(x.a) })), insurance: s(b.insurance), payment: s(b.payment), cur, review: s(b.google_review_link) };\nconst site_url = f.website ? 'https://askhalora.com/site/?c=' + clinic_id : '';\nconst portal_url = 'https://askhalora.com/portal/?c=' + clinic_id + '&k=' + portal_key;\nconst voice_prompt = prompt.replace('You chat with patients on the clinic website.', 'You answer the clinic phone. Speak naturally, short sentences, one question at a time. Read prices and times clearly.').replace(/- When you have all four booking details[^\\n]*/, '- When you have the four booking details, repeat them back, then call the save_appointment_request tool once, then tell them the team will confirm shortly.');\nconst first_message = 'Hello, thank you for calling ' + name + '. This is ' + assistant + ', the virtual receptionist. How can I help you today?';\nconst steps = ['Owner portal: ' + portal_url];\nif (f.website) steps.push('Website: ' + site_url);\nif (f.phone) steps.push('Phone: voice agent created. TODO: buy a phone number and connect it in ElevenLabs.');\nif (f.whatsapp) steps.push('WhatsApp: TODO: connect the clinic number in Meta (10 min with the clinic).');\nconst p = (d) => ({ type: 'string', description: d });\nconst agent_body = { name: 'Halora - ' + name, conversation_config: { agent: { first_message: first_message, language: 'en', prompt: { prompt: voice_prompt, tools: [{ type: 'webhook', name: 'save_appointment_request', description: 'Save the caller appointment request for the clinic team to confirm. Call once when you have name, phone, service and preferred time.', api_schema: { url: 'https://YOUR-INSTANCE.app.n8n.cloud/webhook/your-webhook-path?action=phone_request&c=' + clinic_id, method: 'POST', request_body_schema: { type: 'object', properties: { name: p('Caller full name'), phone: p('Caller phone number'), service: p('Treatment or service requested'), time: p('Preferred day and time'), note: p('Anything else the caller mentioned') }, required: ['name', 'phone', 'service', 'time'] } } }] } } } };\nconst welcome = 'Hi! I am ' + assistant + ', the assistant of ' + name + '. I can answer questions about our services, prices and hours, or take an appointment request. How can I help?';\nconst chat_url = 'https://askhalora.com/chat/?c=' + clinic_id;\nconst embed = '<iframe src=\"' + chat_url + '&embed=1\" style=\"width:380px;height:560px;border:0;border-radius:16px\" title=\"' + name.replace(/\"/g, '') + ' assistant\"></iframe>';\nreturn [{ json: {\n  clinic_id, clinic_name: name, intake_id: row.id, lang: s(b.lang) || 'en',\n  alert_phone: '000000000000', clinic_phone: String(b.owner_phone || b.contact_phone || row.contact_phone || '').replace(/\\D/g, ''),\n  system_prompt: prompt, welcome, chat_url, embed,\n  package: pkg, features, portal_key, site_url, portal_url, site_json: JSON.stringify(site), whatsapp_status: f.whatsapp ? 'needs_meta_connect' : 'not_in_package', wants_phone: f.phone, agent_body, voice_prompt, first_message, agent_name: 'Halora - ' + name, steps: steps.join('\\n'),\n  summary: services.length + ' services, ' + docs.length + ' doctors, ' + faqs.length + ' FAQs'\n} }];"
+      }
+    },
+    {
+      "id": "d1ede2d3-506e-4396-bc3a-933dc6a08275",
+      "name": "Save Clinic",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "clinic_id": "={{ $json.clinic_id }}",
+            "clinic_name": "={{ $json.clinic_name }}",
+            "enabled": "yes",
+            "status": "pilot",
+            "intake_id": "={{ $json.intake_id }}",
+            "lang": "={{ $json.lang }}",
+            "alert_phone": "={{ $json.alert_phone }}",
+            "alert_clinic": "no",
+            "clinic_phone": "={{ $json.clinic_phone }}",
+            "system_prompt": "={{ $json.system_prompt }}",
+            "welcome": "={{ $json.welcome }}",
+            "chat_url": "={{ $json.chat_url }}",
+            "package": "={{ $json.package }}",
+            "features": "={{ $json.features }}",
+            "portal_key": "={{ $json.portal_key }}",
+            "site_json": "={{ $json.site_json }}",
+            "whatsapp_status": "={{ $json.whatsapp_status }}"
+          },
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "clinic_id",
+              "id": "clinic_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "clinic_name",
+              "id": "clinic_name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "enabled",
+              "id": "enabled",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "intake_id",
+              "id": "intake_id",
+              "required": false,
+              "type": "number"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "lang",
+              "id": "lang",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "alert_phone",
+              "id": "alert_phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "alert_clinic",
+              "id": "alert_clinic",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "clinic_phone",
+              "id": "clinic_phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "system_prompt",
+              "id": "system_prompt",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "welcome",
+              "id": "welcome",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "chat_url",
+              "id": "chat_url",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "package",
+              "id": "package",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "features",
+              "id": "features",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "portal_key",
+              "id": "portal_key",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "site_json",
+              "id": "site_json",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "whatsapp_status",
+              "id": "whatsapp_status",
+              "required": false,
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "db6fa498-e714-4b4e-ae89-fa0d7cd9fac8",
+      "name": "Alert Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "000000000000",
+        "messageType": "text",
+        "textBody": "=✅ New clinic set up automatically\n{{ $('Build Clinic Assistant').item.json.clinic_name }} · package: {{ $('Build Clinic Assistant').item.json.package }}\nIncluded: {{ $('Build Clinic Assistant').item.json.features }}\n{{ $('Build Clinic Assistant').item.json.summary }}\n\nChat: {{ $('Build Clinic Assistant').item.json.chat_url }}\n{{ $('Build Clinic Assistant').item.json.steps }}\n\nEmbed code for their site:\n{{ $('Build Clinic Assistant').item.json.embed }}\n\nSwitch: halora_clinics → enabled = yes/no"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "f31c07d3-4e40-4baf-b019-55586b010aa5",
+      "name": "Setup Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "clinic_id",
+              "value": "={{ $('Build Clinic Assistant').item.json.clinic_id }}",
+              "type": "string"
+            },
+            {
+              "id": "r2",
+              "name": "chat_url",
+              "value": "={{ $('Build Clinic Assistant').item.json.chat_url }}",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "embed",
+              "value": "={{ $('Build Clinic Assistant').item.json.embed }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e9898693-7e1e-489e-821f-dee081aa2365",
+      "name": "Phone Included?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        900,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Build Clinic Assistant').item.json.wants_phone }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        }
+      }
+    },
+    {
+      "id": "46c6c95b-4b76-4053-a8ae-f0f2a264c7fc",
+      "name": "Create Voice Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        -100
+      ],
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "contentType": "json",
+        "genericAuthType": "httpHeaderAuth",
+        "jsonBody": "={{ JSON.stringify($('Build Clinic Assistant').item.json.agent_body) }}",
+        "method": "POST",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://api.elevenlabs.io/v1/convai/agents/create"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "ab66ed86-b746-4aa8-813c-3544827a9ab6",
+      "name": "Save Agent Id",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        -100
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone_agent_id",
+              "id": "phone_agent_id",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "phone_agent_id": "={{ $json.agent_id || ('error: ' + JSON.stringify($json).slice(0, 300)) }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "clinic_id",
+              "keyValue": "={{ $('Build Clinic Assistant').item.json.clinic_id }}"
+            }
+          ]
+        },
+        "matchType": "allConditions",
+        "operation": "update",
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "bef90b0f-707a-44e6-a34e-ac4cf8f0f209",
+      "name": "Email Clinic Their Links",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1560,
+        0
+      ],
+      "parameters": {
+        "emailFormat": "text",
+        "fromEmail": "Ziad from Halora <owner@example.com>",
+        "options": {
+          "appendAttribution": false
+        },
+        "subject": "=Your Halora assistant for {{ $('Build Clinic Assistant').item.json.clinic_name }} is ready",
+        "text": "=Hi {{ $('Get Intake').item.json.contact_name || 'there' }},\n\nYour Halora assistant for {{ $('Build Clinic Assistant').item.json.clinic_name }} is ready.\n\nYour private owner portal (keep it safe): {{ $('Build Clinic Assistant').item.json.portal_url }}\nYour AI chat: {{ $('Build Clinic Assistant').item.json.chat_url }}\n{{ $('Build Clinic Assistant').item.json.site_url ? 'Your new website: ' + $('Build Clinic Assistant').item.json.site_url : '' }}\n\nTo add the chat to your own website: portal -> Channels -> Copy embed code.\nWe will contact you to connect WhatsApp and your phone line if they are in your package.\n\nAny changes? Just reply to this email.\n\nZiad Elhoseiny\nFounder, Halora\naskhalora.com",
+        "toEmail": "={{ $('Get Intake').item.json.contact_email }}"
+      },
+      "disabled": true,
+      "notes": "Switch: enable after adding a Zoho SMTP credential (smtp.zoho.com, port 465, SSL, owner@example.com + Zoho app password).",
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    }
+  ],
+  "connections": {
+    "Setup Request": {
+      "main": [
+        [
+          {
+            "node": "Get Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Intake": {
+      "main": [
+        [
+          {
+            "node": "Build Clinic Assistant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Clinic Assistant": {
+      "main": [
+        [
+          {
+            "node": "Save Clinic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Clinic": {
+      "main": [
+        [
+          {
+            "node": "Phone Included?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phone Included?": {
+      "main": [
+        [
+          {
+            "node": "Create Voice Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Voice Agent": {
+      "main": [
+        [
+          {
+            "node": "Save Agent Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Agent Id": {
+      "main": [
+        [
+          {
+            "node": "Alert Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Owner": {
+      "main": [
+        [
+          {
+            "node": "Email Clinic Their Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Clinic Their Links": {
+      "main": [
+        [
+          {
+            "node": "Setup Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

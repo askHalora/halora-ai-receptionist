@@ -1,0 +1,761 @@
+{
+  "name": "Halora – Clinic API (site, portal, phone)",
+  "nodes": [
+    {
+      "id": "95691508-f230-40c0-ace5-0d566d75b872",
+      "name": "API Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        480
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "2e1fe343-8aef-438d-a0d2-3ab4827675c2",
+      "name": "Read API",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        480
+      ],
+      "parameters": {
+        "jsCode": "// Reads the request from the clinic website, owner portal or phone agent.\nconst j = $input.first().json; const b = Object.assign({}, j.query || {}, j.body || {});\nconst s = (v, n) => String(v == null ? '' : v).trim().slice(0, n || 300);\nreturn [{ json: { action: s(b.action, 20), c: s(b.c, 60).toLowerCase().replace(/[^a-z0-9-]/g, ''), k: s(b.k, 60), id: s(b.id, 20), status: s(b.status, 20) || 'done', text: s(b.text, 1500), name: s(b.name), phone: s(b.phone), service: s(b.service), time: s(b.time), note: s(b.note) } }];"
+      }
+    },
+    {
+      "id": "1d077dfe-8f48-4523-8da8-30263d4dce9a",
+      "name": "Get Clinic",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        480
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "clinic_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.c }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "3b825726-8bb5-45b5-968d-46074177a431",
+      "name": "Authorize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        480
+      ],
+      "parameters": {
+        "jsCode": "// Decides what this caller may see. Portal actions need the clinic's secret key.\nconst r = $('Read API').first().json; const cl = $input.first().json || {};\nconst exists = !!cl.clinic_id && cl.enabled !== 'no';\nconst feats = String(cl.features || '').split(',');\nconst keyOk = exists && !!r.k && r.k === cl.portal_key;\nlet route = 'deny';\nif (r.action === 'site' && exists && feats.includes('website')) route = 'site';\nelse if (r.action === 'portal' && keyOk) route = 'portal';\nelse if (r.action === 'done' && keyOk) route = 'done';\nelse if (r.action === 'change' && keyOk) route = 'change';\nelse if (r.action === 'phone_request' && exists) route = 'phone';\nlet site = {}; try { site = JSON.parse(cl.site_json || '{}'); } catch (e) {}\nconst agent = /^error/.test(cl.phone_agent_id || '') ? '' : (cl.phone_agent_id || '');\nreturn [{ json: Object.assign({}, r, { route, clinic_name: cl.clinic_name || '', site, chat_url: cl.chat_url || '', agent_id: agent, features: cl.features || '', package: cl.package || '', whatsapp_status: cl.whatsapp_status || '', alert_phone: cl.alert_phone || '000000000000', enabled: cl.enabled || '' }) }];"
+      }
+    },
+    {
+      "id": "a895d8b9-1052-4e03-84c5-2cfb349b87b8",
+      "name": "Route",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        896,
+        416
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "site",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "site"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "portal",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "portal"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "done",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "done"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "change",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "change"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "phone",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "phone"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Denied"
+        }
+      }
+    },
+    {
+      "id": "37796407-820c-458b-8c73-e22981f65f82",
+      "name": "Reply Site",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, c: $json.c, site: $json.site, agent_id: $json.agent_id }) }}"
+      }
+    },
+    {
+      "id": "8c1266d0-734d-4ddb-9cc6-15e6b6c65648",
+      "name": "Get Requests",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "clinic_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Authorize').item.json.c }}"
+            }
+          ]
+        },
+        "limit": 100,
+        "orderBy": true,
+        "orderByColumn": "createdAt",
+        "orderByDirection": "DESC"
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "5fede671-7d9b-4b21-8bba-ff7c4168a760",
+      "name": "Get Chats",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "clinic_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Authorize').item.json.c }}"
+            }
+          ]
+        },
+        "limit": 300,
+        "orderBy": true,
+        "orderByColumn": "createdAt",
+        "orderByDirection": "DESC"
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "fa114c93-2173-4cde-a88d-eb111e5e6a1b",
+      "name": "Build Portal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        192
+      ],
+      "parameters": {
+        "jsCode": "// Builds the owner dashboard: stats, appointment requests and recent conversations.\nconst a = $('Authorize').first().json;\nconst reqs = $('Get Requests').all().map(i => i.json).filter(x => x.id && x.service !== undefined);\nconst msgs = $('Get Chats').all().map(i => i.json).filter(x => x.id && x.role);\nconst week = Date.now() - 7 * 864e5;\nconst sessions = {};\nmsgs.slice().reverse().forEach(m => { (sessions[m.session] = sessions[m.session] || []).push({ r: m.role, t: m.text, at: m.createdAt }); });\nconst convs = Object.keys(sessions).map(k => ({ id: k, msgs: sessions[k].slice(-20), last: sessions[k][sessions[k].length - 1].at })).sort((x, y) => String(y.last).localeCompare(String(x.last))).slice(0, 40);\nconst stats = {\n  conversations: Object.keys(sessions).length,\n  patient_messages: msgs.filter(m => m.role === 'user').length,\n  requests: reqs.length,\n  new_requests: reqs.filter(x => x.status === 'new').length,\n  requests_week: reqs.filter(x => Date.parse(x.createdAt) > week).length,\n  after_hours: msgs.filter(m => { if (m.role !== 'user') return false; const h = new Date(m.createdAt).getUTCHours(); return h < 5 || h >= 16; }).length\n};\nreturn [{ json: { ok: true, clinic: { name: a.clinic_name, package: a.package, features: a.features, chat_url: a.chat_url, site_url: String(a.features).includes('website') ? 'https://askhalora.com/site/?c=' + a.c : '', agent_id: a.agent_id, whatsapp_status: a.whatsapp_status }, stats, requests: reqs.slice(0, 100).map(x => ({ id: x.id, at: x.createdAt, name: x.patient_name, phone: x.patient_phone, service: x.service, time: x.preferred_time, note: x.note, status: x.status, via: x.session === 'phone' ? 'phone' : 'chat' })), conversations: convs } }];"
+      }
+    },
+    {
+      "id": "7513a3ee-5c74-462d-b942-9b665b5a5dca",
+      "name": "Reply Portal",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1792,
+        192
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      }
+    },
+    {
+      "id": "5b27c277-0243-4433-bb96-88ca3c017298",
+      "name": "Update Request",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        384
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            },
+            {
+              "keyName": "clinic_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.c }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.status }}"
+          },
+          "schema": [
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "23bbf3d8-b1ff-4e6c-8035-0d6a61b253dc",
+      "name": "Reply OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1344,
+        384
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":true}"
+      }
+    },
+    {
+      "id": "9b5e6121-d040-425c-ae86-56f50414cd77",
+      "name": "Alert Change Request",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        576
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "000000000000",
+        "messageType": "text",
+        "textBody": "=✏️ Change request from {{ $('Authorize').item.json.clinic_name }} ({{ $('Authorize').item.json.c }}):\n{{ $('Authorize').item.json.text }}"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "2477d222-45a2-4103-bf30-18b8fe8b591c",
+      "name": "Reply Change",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1344,
+        576
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":true}"
+      }
+    },
+    {
+      "id": "0463d8ab-e49e-4a2a-8fa5-bec69f02c200",
+      "name": "Save Phone Request",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        768
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "clinic_id": "={{ $json.c }}",
+            "clinic_name": "={{ $json.clinic_name }}",
+            "session": "phone",
+            "patient_name": "={{ $json.name }}",
+            "patient_phone": "={{ $json.phone }}",
+            "service": "={{ $json.service }}",
+            "preferred_time": "={{ $json.time }}",
+            "note": "={{ $json.note }}",
+            "status": "new"
+          },
+          "schema": [
+            {
+              "id": "clinic_id",
+              "displayName": "clinic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "clinic_name",
+              "displayName": "clinic_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session",
+              "displayName": "session",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_phone",
+              "displayName": "patient_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "preferred_time",
+              "displayName": "preferred_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8da19aa2-6567-404c-b2fd-8888c0002b58",
+      "name": "Alert Phone Request",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        768
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Authorize').item.json.alert_phone }}",
+        "messageType": "text",
+        "textBody": "=📞 New phone appointment request – {{ $('Authorize').item.json.clinic_name }}\nName: {{ $('Authorize').item.json.name }}\nPhone: {{ $('Authorize').item.json.phone }}\nService: {{ $('Authorize').item.json.service }}\nPreferred: {{ $('Authorize').item.json.time }}\nNote: {{ $('Authorize').item.json.note || '-' }}"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "97a3df32-9374-4101-829f-c4596e96ed57",
+      "name": "Reply Phone",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1568,
+        768
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"result\":\"Request saved. The clinic team will confirm the time shortly.\"}"
+      }
+    },
+    {
+      "id": "fb27f47d-cdcb-417e-ad52-eaacce2b7eab",
+      "name": "Reply Denied",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        960
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":false,\"error\":\"not available\"}",
+        "options": {
+          "responseCode": 403
+        }
+      }
+    }
+  ],
+  "connections": {
+    "API Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read API": {
+      "main": [
+        [
+          {
+            "node": "Get Clinic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Clinic": {
+      "main": [
+        [
+          {
+            "node": "Authorize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorize": {
+      "main": [
+        [
+          {
+            "node": "Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route": {
+      "main": [
+        [
+          {
+            "node": "Reply Site",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Requests",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Change Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Phone Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Denied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Requests": {
+      "main": [
+        [
+          {
+            "node": "Get Chats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Chats": {
+      "main": [
+        [
+          {
+            "node": "Build Portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Portal": {
+      "main": [
+        [
+          {
+            "node": "Reply Portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Request": {
+      "main": [
+        [
+          {
+            "node": "Reply OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Change Request": {
+      "main": [
+        [
+          {
+            "node": "Reply Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Phone Request": {
+      "main": [
+        [
+          {
+            "node": "Alert Phone Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Phone Request": {
+      "main": [
+        [
+          {
+            "node": "Reply Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,232 @@
+{
+  "name": "Noor – Morning Summary",
+  "nodes": [
+    {
+      "id": "f461f90a-9bbd-481e-9c70-b309ffed5279",
+      "name": "Every Day 8:00 (Dubai)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "210b3073-0775-48d0-9391-d0ab5a9c703a",
+      "name": "Read Patients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "fac5e0f7-7f48-4034-8438-dc2a62c47761",
+      "name": "Today's Appointments",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "event",
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $now.setZone('Asia/Dubai').startOf('day').toISO() }}",
+        "timeMax": "={{ $now.setZone('Asia/Dubai').endOf('day').toISO() }}",
+        "options": {
+          "orderBy": "startTime",
+          "recurringEventHandling": "expand"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "4c80b78a-80f8-48cc-8ee6-645cce3b75fd",
+      "name": "Build Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// WhatsApp template variables must be ONE line: no line breaks or tabs.\nconst Z = 'Asia/Dubai';\nconst now = DateTime.now().setZone(Z);\nconst today = now.toFormat('yyyy-MM-dd');\nconst patients = $('Read Patients').all().map(i => i.json).filter(p => p.phone);\nconst events = $('Today\\'s Appointments').all().map(i => i.json).filter(e => e && e.start && (e.start.dateTime || e.start.date));\nconst todays = patients.filter(p => String(p.appointment_start || '').startsWith(today) && /booked|confirmed/i.test(String(p.status || '')));\nconst confirmed = todays.filter(p => /confirmed/i.test(String(p.status))).length;\nconst yesterday = now.minus({ days: 1 });\nconst newLeads = patients.filter(p => String(p.status || '').toLowerCase() === 'lead' && p.last_message_at && DateTime.fromFormat(String(p.last_message_at), 'yyyy-MM-dd HH:mm', { zone: Z }) >= yesterday).length;\nconst human = patients.filter(p => String(p.status || '').toLowerCase() === 'human').length;\nconst list = events.slice(0, 8).map(e => DateTime.fromISO(e.start.dateTime || e.start.date, { zone: Z }).toFormat('HH:mm') + ' ' + String(e.summary || '').replace(/\\s+/g, ' ')).join('; ');\nlet summary = events.length + ' appointments today (' + confirmed + ' confirmed by patients)' + (list ? ': ' + list + (events.length > 8 ? '; ...' : '') : '') + '. New leads in the last 24h: ' + newLeads + '. Waiting for a human reply: ' + human + '.';\nsummary = summary.replace(/[\\n\\t]+/g, ' ').replace(/ {2,}/g, ' ').slice(0, 900);\nreturn [{ json: { date: now.toFormat('cccc d LLLL'), summary } }];\n"
+      }
+    },
+    {
+      "id": "752fb2ef-c596-4180-a42d-7fcf4a5a10ec",
+      "name": "Send Summary to Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ (() => { try { const r = $('Get Setup').all().map(i => i.json || {}).find(x => x.tab === 'clinic' && x.name === 'owner_phone'); const p = r ? String(r.value).replace(/\\D/g, '') : ''; return p.length >= 8 ? p : '000000000000'; } catch (e) { return '000000000000'; } })() }}",
+        "template": "daily_summary|en",
+        "components": {
+          "component": [
+            {
+              "type": "body",
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "type": "text",
+                    "text": "={{ $json.date }}"
+                  },
+                  {
+                    "type": "text",
+                    "text": "={{ $json.summary }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "aa137f3a-3e1c-44c7-99f6-ff87c2751543",
+      "name": "Get Setup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        200
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "tab",
+              "keyValue": "clinic"
+            }
+          ]
+        },
+        "matchType": "allConditions",
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Read Patients": {
+      "main": [
+        [
+          {
+            "node": "Today's Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Today's Appointments": {
+      "main": [
+        [
+          {
+            "node": "Build Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Summary": {
+      "main": [
+        [
+          {
+            "node": "Send Summary to Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Day 8:00 (Dubai)": {
+      "main": [
+        [
+          {
+            "node": "Get Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Setup": {
+      "main": [
+        [
+          {
+            "node": "Read Patients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

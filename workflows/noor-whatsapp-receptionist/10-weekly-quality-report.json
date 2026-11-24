@@ -1,0 +1,447 @@
+{
+  "name": "Noor – Weekly Quality Report",
+  "nodes": [
+    {
+      "id": "1fa7ab92-a2e8-4cda-8c0b-631cc1a66832",
+      "name": "Every Monday 9:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        112
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9,
+              "triggerAtMinute": 7
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ada7d790-3a57-419f-8561-8d999eb2f66a",
+      "name": "Ensure Improvements Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        112
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "create",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "title": "Improvements",
+        "options": {}
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "d4155ebd-2e64-4215-9be4-bcd8089dddb0",
+      "name": "Read Conversations",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        112
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "aa37cbc9-5abd-43f2-aed8-807770bddd7e",
+      "name": "Read Patients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        112
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b4d87cf9-f9cd-4063-93ef-4e5e8780ec7e",
+      "name": "Read Cancellations",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        112
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "cca4e9a3-4ae1-45a9-bf18-dabc702a9ada",
+      "name": "Read Unanswered",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        112
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d7074232-2771-4d54-8069-2c02d3f4a1fd",
+      "name": "Build Weekly Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        112
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Last 7 days (Dubai time) from the sheet tabs.\nconst now = DateTime.now().setZone('Asia/Dubai');\nconst since = now.minus({ days: 7 });\nfunction inWeek(t) {\n  const d = DateTime.fromFormat(String(t || ''), 'yyyy-MM-dd HH:mm', { zone: 'Asia/Dubai' });\n  return d.isValid && d >= since;\n}\nfunction rows(name) { return $(name).all().map(function (i) { return i.json || {}; }).filter(function (r) { return !r.error && Object.keys(r).length; }); }\nconst conv = rows('Read Conversations').filter(function (r) { return inWeek(r.time); });\nconst incoming = conv.filter(function (r) { return r.direction === 'in'; });\nconst patients = rows('Read Patients');\nconst cancels = rows('Read Cancellations').filter(function (r) { return inWeek(r.time); });\nconst unanswered = rows('Read Unanswered').filter(function (r) { return inWeek(r.time); });\n\nconst chats = new Set(incoming.map(function (r) { return String(r.phone); })).size;\nconst booked = patients.filter(function (r) { return ['booked', 'confirmed', 'completed'].indexOf(String(r.status).toLowerCase()) >= 0 && inWeek(r.last_message_at); }).length;\nconst handovers = conv.filter(function (r) { return /team member will|our team will|سيتواصل|هيتواصل|فريق/i.test(String(r.text)) && r.direction === 'out'; }).length;\nconst cancelAsked = cancels.filter(function (r) { return r.saved === 'asked'; }).length;\nconst cancelSaved = cancels.filter(function (r) { return r.saved === 'yes'; }).length;\nconst cancelled = cancels.filter(function (r) { return r.saved === 'no'; }).length;\n\n// Most common topics from incoming messages (simple keyword buckets).\nconst TOPICS = { price: /price|cost|how much|بكام|سعر|كم/i, booking: /book|appointment|slot|موعد|ميعاد|احجز/i, cancel: /cancel|resched|الغ|إلغ|تأجيل/i, location: /where|location|parking|address|فين|وين|موقع|موقف/i, insurance: /insurance|daman|تأمين/i, pain: /pain|hurt|swell|وجع|ألم|الم|ورم/i, whitening: /whiten|تبييض/i, aligners: /align|braces|تقويم/i, hours: /open|hours|time|مواعيد|الساعة/i };\nconst counts = {};\nincoming.forEach(function (r) { Object.keys(TOPICS).forEach(function (k) { if (TOPICS[k].test(String(r.text))) counts[k] = (counts[k] || 0) + 1; }); });\nconst top = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).slice(0, 5).map(function (k) { return k + ' (' + counts[k] + ')'; }).join(', ') || 'none';\n\n// Up to 20 recent conversations for the AI review.\nconst byPhone = {};\nconv.forEach(function (r) { const p = String(r.phone); (byPhone[p] = byPhone[p] || []).push((r.direction === 'in' ? 'Patient: ' : 'Noor: ') + String(r.text).slice(0, 300)); });\nconst sample = Object.keys(byPhone).slice(-20).map(function (p, i) { return 'Conversation ' + (i + 1) + ':\\n' + byPhone[p].slice(-12).join('\\n'); }).join('\\n\\n');\n\nconst week = since.toFormat('d LLL') + ' - ' + now.toFormat('d LLL yyyy');\nconst line = chats + (chats === 1 ? ' patient' : ' patients') + ' chatted, ' + incoming.length + ' messages, ' + booked + ' booked/confirmed, ' + cancelAsked + ' cancel requests (' + cancelSaved + ' saved, ' + cancelled + ' cancelled), ' + handovers + ' handovers to staff, ' + unanswered.length + ' unanswered questions. Top topics: ' + top + '.';\nreturn [{ json: { week: week, line: line.replace(/\\s+/g, ' ').slice(0, 900), sample: sample || 'No conversations this week.', unanswered: unanswered.map(function (u) { return u.question; }).join(' | ') } }];\n"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "da1bf7f1-c32e-402f-95ab-5431cc189db1",
+      "name": "Review Conversations",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1568,
+        112
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are reviewing a week of WhatsApp conversations between patients and Noor, the AI receptionist of BrightSmile Dental (Dubai).\n\nWeekly numbers: {{ $json.line }}\nQuestions Noor could not answer: {{ $json.unanswered || 'none' }}\n\nConversations:\n{{ $json.sample }}\n\nFind up to 5 concrete improvements: missing answers, confusing or wrong replies, wrong language, robotic tone, missed booking chances. Reply ONLY with a JSON array, no other text, like:\n[{\"suggestion\": \"Add the price of veneers to the knowledge base\", \"example\": \"Patient asked about veneer prices and Noor could not answer\"}]",
+        "hasOutputParser": false
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6f604856-d7ee-4590-becd-d7d64bdeef7c",
+      "name": "Claude Haiku (Review)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        1648,
+        336
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-haiku-4-5-20251001",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 1200,
+          "temperature": 0.2
+        }
+      }
+    },
+    {
+      "id": "a866f792-7a35-42b2-8db4-6ae5f45aaa91",
+      "name": "Suggestions To Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        112
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const raw = String(($input.first().json || {}).text || '');\nconst m = raw.match(/\\[[\\s\\S]*\\]/);\nlet list = [];\ntry { list = m ? JSON.parse(m[0]) : []; } catch (e) { list = []; }\nconst week = $('Build Weekly Stats').first().json.week;\nconst out = list.slice(0, 5).map(function (s) { return { json: { week: week, suggestion: String(s.suggestion || ''), example: String(s.example || ''), status: 'proposed' } }; });\nreturn out.length ? out : [{ json: { week: week, suggestion: 'No suggestions this week', example: '', status: 'info' } }];\n"
+      }
+    },
+    {
+      "id": "c9f6533f-7b08-4bf1-a65b-5dad787209d6",
+      "name": "Save Suggestions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2144,
+        112
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "12138316-1030-4693-899c-a3fd6f341e36",
+      "name": "Send Weekly Report",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2368,
+        112
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendTemplate",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "000000000000",
+        "template": "daily_summary|en",
+        "components": {
+          "component": [
+            {
+              "type": "body",
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "type": "text",
+                    "text": "={{ 'the week ' + $('Build Weekly Stats').first().json.week }}"
+                  },
+                  {
+                    "type": "text",
+                    "text": "={{ $('Build Weekly Stats').first().json.line + ' New improvement ideas are in the Improvements tab.' }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "executeOnce": true,
+      "webhookId": "REPLACE_ME"
+    }
+  ],
+  "connections": {
+    "Every Monday 9:00": {
+      "main": [
+        [
+          {
+            "node": "Ensure Improvements Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure Improvements Tab": {
+      "main": [
+        [
+          {
+            "node": "Read Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Conversations": {
+      "main": [
+        [
+          {
+            "node": "Read Patients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Patients": {
+      "main": [
+        [
+          {
+            "node": "Read Cancellations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Cancellations": {
+      "main": [
+        [
+          {
+            "node": "Read Unanswered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Unanswered": {
+      "main": [
+        [
+          {
+            "node": "Build Weekly Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Weekly Stats": {
+      "main": [
+        [
+          {
+            "node": "Review Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Conversations": {
+      "main": [
+        [
+          {
+            "node": "Suggestions To Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Haiku (Review)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Review Conversations",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggestions To Rows": {
+      "main": [
+        [
+          {
+            "node": "Save Suggestions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Suggestions": {
+      "main": [
+        [
+          {
+            "node": "Send Weekly Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

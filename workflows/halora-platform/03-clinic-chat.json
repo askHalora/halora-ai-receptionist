@@ -1,0 +1,832 @@
+{
+  "name": "Halora – Clinic Chat",
+  "nodes": [
+    {
+      "id": "e3285f65-69a7-41fa-91dd-cfd35d82b4d3",
+      "name": "Chat Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        256
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "d7b9b37c-0cc2-41a0-a068-388fb01d800d",
+      "name": "Read Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        256
+      ],
+      "parameters": {
+        "jsCode": "// Cleans the incoming chat message from the website widget.\nconst b = $input.first().json.body || {};\nconst c = String(b.c || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 60);\nconst session = String(b.session || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 40) || 'anon';\nconst message = String(b.message || '').trim().slice(0, 1000);\nreturn [{ json: { c, session, message, init: !message } }];"
+      }
+    },
+    {
+      "id": "cf205a61-9edb-4002-87ea-5bf408ac7f06",
+      "name": "Get Clinic",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        256
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "clinic_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.c }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "88d4781c-d6ab-43d0-a618-83c1207bb37f",
+      "name": "Clinic On?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        256
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.enabled }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "yes"
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "09c626b5-a2f7-4e8d-9225-fc8163fabb4c",
+      "name": "Opening Chat?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Read Input').item.json.init }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "74338afb-3dbb-4e29-881d-883c821800ba",
+      "name": "Reply Welcome",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        64
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, clinic: $('Get Clinic').item.json.clinic_name, reply: $('Get Clinic').item.json.welcome }) }}"
+      }
+    },
+    {
+      "id": "6b3cb917-8a4c-4317-a5eb-9f39d0b8596e",
+      "name": "Get History",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        256
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "clinic_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Read Input').item.json.c }}"
+            },
+            {
+              "keyName": "session",
+              "condition": "eq",
+              "keyValue": "={{ $('Read Input').item.json.session }}"
+            }
+          ]
+        },
+        "limit": 60,
+        "orderBy": true,
+        "orderByColumn": "createdAt",
+        "orderByDirection": "DESC"
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "d610fef9-854f-49d4-a4da-20db1cb52d5a",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        256
+      ],
+      "parameters": {
+        "jsCode": "// Builds the prompt: last messages of this chat + the new message. Caps long chats to protect usage.\nconst inp = $('Read Input').first().json;\nconst clinic = $('Get Clinic').first().json;\nconst hist = $input.all().map(i => i.json).filter(r => r.role).reverse();\nconst userCount = hist.filter(r => r.role === 'user').length;\nconst lines = hist.slice(-12).map(r => (r.role === 'user' ? 'Patient: ' : 'You: ') + r.text);\nconst today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });\nconst text = (lines.length ? 'Conversation so far:\\n' + lines.join('\\n') + '\\n\\n' : '') + 'Patient: ' + inp.message + '\\n\\nWrite your next reply to the patient.';\nreturn [{ json: { text, system: clinic.system_prompt + '\\n\\nToday is ' + today + '.', over: userCount >= 30 } }];"
+      }
+    },
+    {
+      "id": "44c88fc7-e8d2-4aa3-abd5-871db563b8d0",
+      "name": "Within Limit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        256
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.over }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "80ac4f1f-0e70-4f79-b9b0-d656d58c224f",
+      "name": "Clinic Assistant",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "={{ $json.system }}",
+          "maxIterations": 3,
+          "enableStreaming": false
+        }
+      }
+    },
+    {
+      "id": "3392e567-4287-4d87-ae2c-d2da7193c777",
+      "name": "Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        1872,
+        224
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "maxTokensToSample": 700
+        }
+      }
+    },
+    {
+      "id": "c534e424-0dce-466e-b0e8-031b457fc672",
+      "name": "Parse Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        112
+      ],
+      "parameters": {
+        "jsCode": "// Splits the AI answer into the visible reply and an optional appointment request.\nconst out = String($input.first().json.output || '');\nconst m = out.match(/\\[\\[REQUEST\\]\\]([\\s\\S]*?)\\[\\[\\/REQUEST\\]\\]/);\nlet req = null;\nif (m) { try { req = JSON.parse(m[1]); } catch (e) { req = { note: m[1].slice(0, 300) }; } }\nconst reply = out.replace(/\\[\\[REQUEST\\]\\][\\s\\S]*?(\\[\\[\\/REQUEST\\]\\]|$)/, '').trim() || 'Sorry, could you say that again?';\nconst s = v => String(v == null ? '' : v).slice(0, 200);\nreturn [{ json: { reply, has_request: !!req, r_name: s(req && req.name), r_phone: s(req && req.phone), r_service: s(req && req.service), r_time: s(req && req.time), r_note: s(req && req.note) } }];"
+      }
+    },
+    {
+      "id": "43446bb8-ddd4-462d-9547-80d6d81e4980",
+      "name": "Save Patient Message",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2368,
+        112
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "clinic_id": "={{ $('Read Input').item.json.c }}",
+            "session": "={{ $('Read Input').item.json.session }}",
+            "role": "user",
+            "text": "={{ $('Read Input').item.json.message }}"
+          },
+          "schema": [
+            {
+              "id": "clinic_id",
+              "displayName": "clinic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session",
+              "displayName": "session",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e30131db-f3f8-403c-8f5f-bb7749f70b9d",
+      "name": "Save Reply",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2592,
+        112
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "clinic_id": "={{ $('Read Input').item.json.c }}",
+            "session": "={{ $('Read Input').item.json.session }}",
+            "role": "assistant",
+            "text": "={{ $('Parse Reply').item.json.reply }}"
+          },
+          "schema": [
+            {
+              "id": "clinic_id",
+              "displayName": "clinic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session",
+              "displayName": "session",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "24b77440-23df-42fb-b3c0-f020fb9ee3b7",
+      "name": "Appointment Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2816,
+        112
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Parse Reply').item.json.has_request }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "c6d32e08-6547-4822-96cc-9e1fac1cab92",
+      "name": "Save Request",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3040,
+        32
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "clinic_id": "={{ $('Read Input').item.json.c }}",
+            "clinic_name": "={{ $('Get Clinic').item.json.clinic_name }}",
+            "session": "={{ $('Read Input').item.json.session }}",
+            "patient_name": "={{ $('Parse Reply').item.json.r_name }}",
+            "patient_phone": "={{ $('Parse Reply').item.json.r_phone }}",
+            "service": "={{ $('Parse Reply').item.json.r_service }}",
+            "preferred_time": "={{ $('Parse Reply').item.json.r_time }}",
+            "note": "={{ $('Parse Reply').item.json.r_note }}",
+            "status": "new"
+          },
+          "schema": [
+            {
+              "id": "clinic_id",
+              "displayName": "clinic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "clinic_name",
+              "displayName": "clinic_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session",
+              "displayName": "session",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_phone",
+              "displayName": "patient_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "preferred_time",
+              "displayName": "preferred_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "508b4b9b-bebb-4648-86b2-eff9d3e793b9",
+      "name": "Alert New Request",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3264,
+        32
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Get Clinic').item.json.alert_phone }}",
+        "messageType": "text",
+        "textBody": "=📅 New appointment request – {{ $('Get Clinic').item.json.clinic_name }}\nName: {{ $('Parse Reply').item.json.r_name }}\nPhone: {{ $('Parse Reply').item.json.r_phone }}\nService: {{ $('Parse Reply').item.json.r_service }}\nPreferred: {{ $('Parse Reply').item.json.r_time }}\nNote: {{ $('Parse Reply').item.json.r_note || '-' }}\nSaved in halora_clinic_requests."
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "a86fc255-a12a-4331-b69d-0c3a24dd0e89",
+      "name": "Reply",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3488,
+        112
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, reply: $('Parse Reply').item.json.reply }) }}"
+      }
+    },
+    {
+      "id": "ca1309a6-9e3b-46e1-9aef-09d7912a36df",
+      "name": "Reply Limit",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1856,
+        400
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":true,\"reply\":\"Thanks for chatting! For anything else, please contact the clinic directly and the team will help you.\"}"
+      }
+    },
+    {
+      "id": "88f05949-351c-42c7-ad35-caecd49c8f67",
+      "name": "Reply Off",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        896,
+        352
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":false,\"reply\":\"This assistant is not active right now. Please contact the clinic directly.\"}"
+      }
+    }
+  ],
+  "connections": {
+    "Chat Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Input": {
+      "main": [
+        [
+          {
+            "node": "Get Clinic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Clinic": {
+      "main": [
+        [
+          {
+            "node": "Clinic On?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clinic On?": {
+      "main": [
+        [
+          {
+            "node": "Opening Chat?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Off",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Opening Chat?": {
+      "main": [
+        [
+          {
+            "node": "Reply Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get History": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Within Limit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Within Limit?": {
+      "main": [
+        [
+          {
+            "node": "Clinic Assistant",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clinic Assistant": {
+      "main": [
+        [
+          {
+            "node": "Parse Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Clinic Assistant",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Reply": {
+      "main": [
+        [
+          {
+            "node": "Save Patient Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Patient Message": {
+      "main": [
+        [
+          {
+            "node": "Save Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Reply": {
+      "main": [
+        [
+          {
+            "node": "Appointment Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Appointment Request?": {
+      "main": [
+        [
+          {
+            "node": "Save Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Request": {
+      "main": [
+        [
+          {
+            "node": "Alert New Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert New Request": {
+      "main": [
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

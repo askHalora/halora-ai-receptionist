@@ -1,0 +1,837 @@
+{
+  "name": "Noor – Owner Mode",
+  "nodes": [
+    {
+      "id": "5602a72c-c259-4365-9e46-579facbe85ea",
+      "name": "Message Info",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "phone",
+              "type": "string"
+            },
+            {
+              "name": "text",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3fd0076d-0baf-455a-a106-45e06375dcb0",
+      "name": "Owner Manager",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "options": {
+          "enableStreaming": false,
+          "maxIterations": 6,
+          "systemMessage": "=You are Noor's manager mode for the owner of BrightSmile Dental in Dubai. The owner writes messages starting with #.\nToday is {{ $now.setZone('Asia/Dubai').toFormat('cccc d LLLL yyyy, HH:mm') }} (Dubai time).\n\nAnswer the owner's questions about the clinic using your tools:\n- read_patients: all patient rows (phone, name, service, status, appointment_start, dentist, insurance, followups_sent, review_requested, last_message_at...). Statuses: lead (asked but did not book), booked, confirmed, completed, cancelled, not_now, no_reply, human (needs a person).\n- read_calendar: appointments in the BrightSmile Dental calendar between two times (ISO 8601 with +04:00).\n- find_free_slots: free times for a service on a date.\n- owner_approval, owner_requests_list, owner_request_done, owner_treatment_plan: for the commands #approval, #requests, #done and #plan.\n- owner_book (#book phone name service day time [dentist]) and owner_cancel (#cancel phone): book or cancel in the real calendar and Patients tab. Work out the exact date from today's date above; if the day or time is unclear, ask the owner instead of guessing.\n\nRules:\n- Phone numbers: use exactly the digits the owner wrote (remove + and spaces). Never say a number is incomplete or wrong; UAE numbers like 000000000000 have 12 digits. The tools tell you if no patient is found.\n- Be brief and factual: numbers first, then a short list (max 10 lines). Use *single asterisks* for bold. Reply in the owner's language.\n- Count carefully. Use Dubai time. If the data does not answer the question, say so.\n- Say something is booked or cancelled only if owner_book or owner_cancel confirmed it, and repeat the exact day, time and dentist it returned.\n- After a booking or cancellation, remind the owner they can tell the patient with: #reply <phone> <message>.\n- Apart from these command tools you can only READ data.\n- Useful answers: today's/tomorrow's schedule, new leads, patients waiting for a human, no-shows/cancellations, confirmed vs unconfirmed, reviews requested, follow-ups sent.\n"
+        },
+        "promptType": "define",
+        "text": "={{ $('Message Info').first().json.text.replace(/^#+\\s*/, '') }}"
+      }
+    },
+    {
+      "id": "85dcfc8b-224a-4e81-9e1f-1c976da3fac8",
+      "name": "Claude Haiku (Owner)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        450,
+        240
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "cachedResultName": "Claude Haiku 4.5",
+          "mode": "list",
+          "value": "claude-haiku-4-5-20251001"
+        },
+        "options": {
+          "maxTokensToSample": 1024,
+          "temperature": 0.2
+        }
+      }
+    },
+    {
+      "id": "55b2ab49-d3d4-4e8a-8f32-051691a08bac",
+      "name": "Owner Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        600,
+        240
+      ],
+      "parameters": {
+        "contextWindowLength": 8,
+        "sessionIdType": "customKey",
+        "sessionKey": "owner-manager"
+      }
+    },
+    {
+      "id": "ac80cb1a-7c65-4d7b-acad-39166b8b912d",
+      "name": "read_patients",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        750,
+        240
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "descriptionType": "manual",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "read",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "toolDescription": "Returns all rows of the BrightSmile Patients sheet."
+      }
+    },
+    {
+      "id": "8957d89c-a9d0-4b1f-ba31-93dda04f88b5",
+      "name": "read_calendar",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        900,
+        240
+      ],
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "descriptionType": "manual",
+        "operation": "getAll",
+        "options": {
+          "orderBy": "startTime",
+          "recurringEventHandling": "expand"
+        },
+        "resource": "event",
+        "returnAll": true,
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('timeMax', 'End, ISO 8601 with +04:00') }}",
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('timeMin', 'Start, ISO 8601 with +04:00') }}",
+        "toolDescription": "Lists appointments in the BrightSmile Dental calendar between timeMin and timeMax."
+      }
+    },
+    {
+      "id": "87a29d0c-a09b-40e6-b661-7049e9d1820a",
+      "name": "find_free_slots",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1050,
+        240
+      ],
+      "parameters": {
+        "description": "Returns free appointment times for a service on a date.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "date",
+              "id": "date",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "days",
+              "id": "days",
+              "required": false,
+              "type": "number"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "find_slots",
+            "date": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('date', 'First day, YYYY-MM-DD') }}",
+            "days": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('days', 'Number of days 1-7', 'number') }}",
+            "phone": "owner",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('service', 'Service, or consultation') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "2c4f3541-b060-45a3-8a92-79b0e84fd7f3",
+      "name": "owner_approval",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        240
+      ],
+      "parameters": {
+        "description": "OWNER ONLY. Saves an insurance pre-approval update for a patient (e.g. from '#approval 000000000000 approved implant Daman') and messages the patient when it is approved or rejected.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "reason",
+              "id": "reason",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "saved",
+              "id": "saved",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "minutes",
+              "id": "minutes",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "owner_approval",
+            "minutes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('patient_phone', 'Patient WhatsApp number with country code, digits only') }}",
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "reason": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('insurer', 'Insurer name if given, otherwise empty') }}",
+            "saved": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('status', 'pending, approved or rejected') }}",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('treatment', 'Treatment name, e.g. implant') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "af5ef09b-2394-4034-91a6-cf9d4b496bfa",
+      "name": "owner_requests_list",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1350,
+        240
+      ],
+      "parameters": {
+        "description": "OWNER ONLY. Lists open patient requests (invoices, X-rays, sick-leave notes...) with request numbers and phone numbers.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "items",
+              "id": "items",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "owner_requests_list",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('note', 'Leave empty') }}",
+            "phone": "={{ $('Message Info').first().json.phone }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "9c614af5-55b3-4f04-9e1b-4a528c8c31b4",
+      "name": "owner_request_done",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1500,
+        240
+      ],
+      "parameters": {
+        "description": "OWNER ONLY. Marks a patient request as ready or done (e.g. '#done R10081530' or '#done R10081530 booked Thursday 5pm') and messages the patient, including the owner's note if one was written. Find the patient phone with owner_requests_list first.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "items",
+              "id": "items",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "minutes",
+              "id": "minutes",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "reason",
+              "id": "reason",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "owner_request_done",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('request_id', 'Request number, e.g. R10081530') }}",
+            "minutes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('patient_phone', 'Phone number of the patient who made this request, digits only') }}",
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "reason": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('note', 'Optional short update for the patient that the owner wrote after the request number. Empty if there is none.') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "5e986c89-cba5-4cf0-92d8-78a1c98a58d6",
+      "name": "owner_treatment_plan",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1650,
+        240
+      ],
+      "parameters": {
+        "description": "OWNER ONLY. Saves a treatment plan the dentist recommended for a patient (e.g. from '#plan 000000000000 root canal 1500') so Noor can follow up later.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "items",
+              "id": "items",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "minutes",
+              "id": "minutes",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "owner_treatment_plan",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('price', 'Price in AED if given, otherwise empty') }}",
+            "minutes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('patient_phone', 'Patient WhatsApp number with country code, digits only') }}",
+            "phone": "={{ $('Message Info').first().json.phone }}",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('treatment', 'Recommended treatment') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "0377ff4f-2c2b-493a-b73c-8fc36f65bcbc",
+      "name": "Clean Owner Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "jsCode": "let t = String($json.output || '').trim();\nt = t.replace(/\\*\\*(.+?)\\*\\*/g, '*$1*');            // WhatsApp bold uses single stars\nt = t.replace(/^#{1,6}\\s*/gm, '');                   // no markdown headings\nt = t.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^)]+)\\)/g, '$1: $2'); // plain links\nt = t.replace(/\\n{3,}/g, '\\n\\n');\nif (!t) t = 'Sorry, something went wrong on my side. A team member will reply to you shortly.';\nif (t.length > 3500) t = t.slice(0, 3500) + '…';\nreturn { json: { reply: t } };\n",
+        "language": "javaScript",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "5ff719c0-cbd0-46d3-9278-07bd86fbfc20",
+      "name": "owner_book",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1800,
+        240
+      ],
+      "parameters": {
+        "description": "OWNER ONLY. Books an appointment for a patient in the calendar and the Patients tab (e.g. '#book 000000000000 Adam Mohamed children check-up Sat 14 Nov 4pm Dr Lina'). Check the time with find_free_slots first if unsure. If the phone already has a booking for a different person, it is saved as a family booking.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "start",
+              "id": "start",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "dentist",
+              "id": "dentist",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "name",
+              "id": "name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "source",
+              "id": "source",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "book",
+            "dentist": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('dentist', 'Dentist name if the owner named one, otherwise empty') }}",
+            "name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('patient_name', 'Full name of the person the appointment is for') }}",
+            "phone": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('patient_phone', 'Patient WhatsApp number with country code, digits only') }}",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('service', 'Service, e.g. cleaning, children check-up') }}",
+            "source": "owner",
+            "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start', 'Appointment start in Dubai time, format YYYY-MM-DD HH:mm') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "45d966f7-e335-4b1c-a04f-09ac46e5e6d1",
+      "name": "owner_cancel",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1950,
+        240
+      ],
+      "parameters": {
+        "description": "OWNER ONLY. Cancels the upcoming booking saved for a patient phone (e.g. '#cancel 000000000000'). It only cancels the main booking of that phone, not family bookings (those are deleted in the calendar).",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "source",
+              "id": "source",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "cancel",
+            "phone": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('patient_phone', 'Patient WhatsApp number with country code, digits only') }}",
+            "source": "owner"
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Owner Manager": {
+      "main": [
+        [
+          {
+            "node": "Clean Owner Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Haiku (Owner)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owner Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "read_patients": {
+      "ai_tool": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "read_calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "find_free_slots": {
+      "ai_tool": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "owner_approval": {
+      "ai_tool": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "owner_requests_list": {
+      "ai_tool": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "owner_request_done": {
+      "ai_tool": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "owner_treatment_plan": {
+      "ai_tool": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Info": {
+      "main": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "owner_book": {
+      "ai_tool": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "owner_cancel": {
+      "ai_tool": [
+        [
+          {
+            "node": "Owner Manager",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

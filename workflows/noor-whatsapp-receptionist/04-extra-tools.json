@@ -1,0 +1,1053 @@
+{
+  "name": "Noor – Extra Tools",
+  "nodes": [
+    {
+      "id": "8c07ba50-504d-4a13-863a-84b184c4682d",
+      "name": "Tool Request",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "action",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "type": "string"
+            },
+            {
+              "name": "items",
+              "type": "string"
+            },
+            {
+              "name": "language",
+              "type": "string"
+            },
+            {
+              "name": "service",
+              "type": "string"
+            },
+            {
+              "name": "reason",
+              "type": "string"
+            },
+            {
+              "name": "saved",
+              "type": "string"
+            },
+            {
+              "name": "minutes",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "29f402b5-43d3-4552-a61f-dfc2ec2adaba",
+      "name": "Read Noor Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "7586b5e1-01ae-4b2a-bc16-0f965573e9e2",
+      "name": "Check Switch and Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Noor – Extra Tools: checks the on/off switch, then runs the requested tool.\nconst input = $('Tool Request').first().json;\nconst action = String(input.action || '').trim();\n\n// Read switches from the Noor Settings tab (missing or unreadable = OFF).\nconst on = {};\nfor (const it of $('Read Noor Settings').all()) {\n  const r = it.json || {};\n  const k = String(r.feature || '').trim();\n  if (k) on[k] = String(r.enabled).trim().toUpperCase() === 'TRUE';\n}\n\n// Clinic setup (switch: clinic_setup): owner phone, currency, map pin, prices and instalments from the Sheet.\nconst SETUP = {};\nlet PRICE_ROWS = [];\nif (on.clinic_setup) {\n  try {\n    const rows = $('Get Setup').all().map(function (i) { return i.json || {}; }).filter(function (r) { return r.tab; })\n      .sort(function (a, b) { return Number(a.sort || 0) - Number(b.sort || 0); });\n    rows.filter(function (r) { return r.tab === 'clinic'; }).forEach(function (r) { SETUP[r.name] = String(r.value || '').trim(); });\n    PRICE_ROWS = rows.filter(function (r) { return r.tab === 'price' && r.value !== '' && !isNaN(Number(r.value)); });\n  } catch (e) { /* fallback values */ }\n}\nconst ownerDigits = String(SETUP.owner_phone || '').replace(/\\D/g, '');\nconst OWNER = ownerDigits.length >= 8 ? ownerDigits : '000000000000';\nconst CUR = SETUP.currency || 'AED';\nconst INST_MIN = Number(SETUP.instalments_min_total) || 2000;\nconst INST_MONTHS = Number(SETUP.instalments_months) || 6;\n\nconst FEATURE = {\n  estimate_price: 'price_estimator', send_location: 'location_pin', running_late: 'running_late', log_cancellation: 'save_cancellation',\n  search_knowledge: 'knowledge_base', log_unanswered: 'unanswered_log', log_request: 'request_tracker', approval_status: 'approval_tracker',\n  owner_approval: 'approval_tracker', owner_requests_list: 'request_tracker', owner_request_done: 'request_tracker', owner_treatment_plan: 'treatment_followup'\n};\n// alert_staff: WhatsApp note to the clinic team, logged in Conversations. Test numbers (000000000000xx) never send.\nif (action === 'alert_staff') {\n  const ph = String(input.phone || '').replace(/\\D/g, '');\n  if (/^000000000000/.test(ph)) return [{ json: { route: 'done', response: 'Team alerted (test mode).' } }];\n  const t = DateTime.now().setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm');\n  const msg = '[Noor] Patient +' + ph + ': ' + String(input.items || '').slice(0, 500);\n  return [{ json: { route: 'append', sheet: 'Conversations', row: { time: t, phone: ph, direction: 'alert', type: 'text', text: msg }, notify_phone: OWNER, notify_text: msg, response: 'The clinic team has been alerted.' } }];\n}\nconst feature = FEATURE[action];\nif (!feature) {\n  return [{ json: { route: 'done', response: 'Unknown tool.' } }];\n}\nif (!on[feature]) {\n  return [{ json: { route: 'done', response: 'This feature is switched off. Answer the patient normally without it.' } }];\n}\n\nconst phone = String(input.phone || '').replace(/\\D/g, '');\nif (action === 'send_location') {\n  const lat = Number(SETUP.map_latitude);\n  const lng = Number(SETUP.map_longitude);\n  return [{ json: {\n    route: 'send_location', phone: phone,\n    lat: isFinite(lat) && SETUP.map_latitude ? lat : 25.2185,\n    lng: isFinite(lng) && SETUP.map_longitude ? lng : 55.2532,\n    place: SETUP.clinic_name || 'BrightSmile Dental (demo)',\n    address: SETUP.address ? SETUP.address + (SETUP.parking ? '. ' + SETUP.parking + '.' : '') : 'Jumeirah, Dubai, UAE (demo address). Free parking for patients.'\n  } }];\n}\nif (action === 'running_late') {\n  return [{ json: { route: 'running_late', phone: phone, owner: OWNER } }];\n}\nconst nowTxt = DateTime.now().setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm');\nconst digits = function (v) { return String(v || '').replace(/\\D/g, ''); };\nif (action === 'search_knowledge') {\n  return [{ json: { route: 'read', sheet: 'Knowledge Base', query: String(input.items || '') } }];\n}\nif (action === 'approval_status') {\n  return [{ json: { route: 'read', sheet: 'Approvals', query: phone } }];\n}\nif (action === 'owner_requests_list') {\n  return [{ json: { route: 'read', sheet: 'Requests', query: '' } }];\n}\nif (action === 'log_unanswered') {\n  return [{ json: { route: 'append', sheet: 'Unanswered', row: { time: nowTxt, phone: phone, question: String(input.items || ''), status: 'new' },\n    response: 'Question logged for the team. Tell the patient kindly that a team member will confirm soon, and call alert_staff if you have not already.' } }];\n}\nif (action === 'log_request') {\n  const id = 'R' + DateTime.now().toFormat('ddHHmmss');\n  return [{ json: { route: 'append', sheet: 'Requests', row: { key: id, time: nowTxt, phone: phone, type: String(input.service || 'request'), details: String(input.items || ''), status: 'open', updated_at: nowTxt },\n    response: 'Request ' + id + ' logged. Tell the patient their request number (' + id + '), that the team will prepare it, and that you will message them when it is ready. Call alert_staff with the request number.' } }];\n}\nif (action === 'owner_approval') {\n  const target = digits(input.minutes);\n  const status = String(input.saved || 'pending').toLowerCase().trim();\n  if (!target) return [{ json: { route: 'done', response: 'Please include the patient phone number, e.g. #approval 000000000000 approved implant.' } }];\n  const row = { key: target, phone: target, treatment: String(input.service || ''), insurer: String(input.reason || ''), status: status, updated_at: nowTxt };\n  let notify = '';\n  if (status === 'approved') notify = 'Good news! Your insurance approval for ' + (row.treatment || 'your treatment') + ' has been approved. Would you like to book your appointment? Just reply here.';\n  if (status === 'rejected') notify = 'Update on your insurance approval for ' + (row.treatment || 'your treatment') + ': unfortunately it was not approved. Our team can explain your options; reply here and we will help.';\n  return [{ json: { route: 'append', sheet: 'Approvals', row: row, notify_phone: notify ? target : '', notify_text: notify,\n    response: 'Approval for ' + target + ' saved as ' + status + '.' + (notify ? ' The patient is being messaged.' : '') } }];\n}\nif (action === 'owner_request_done') {\n  const id = String(input.items || '').trim().toUpperCase();\n  const target = digits(input.minutes);\n  if (!id) return [{ json: { route: 'done', response: 'Please include the request number, e.g. #done R10081530.' } }];\n  const note = String(input.reason || '').trim();\n  return [{ json: { route: 'upsert', sheet: 'Requests', row: { key: id, status: note ? 'done' : 'ready', note: note, updated_at: nowTxt }, notify_phone: target,\n    notify_text: note ? 'Update on your request ' + id + ': ' + note : 'Your request ' + id + ' is ready. You can collect it at the clinic, or reply here if you would like it sent another way.',\n    response: 'Request ' + id + ' marked ' + (note ? 'done' : 'ready') + '.' + (target ? ' The patient is being messaged.' : ' (No patient phone given, so no message was sent.)') } }];\n}\nif (action === 'owner_treatment_plan') {\n  const target = digits(input.minutes);\n  if (!target) return [{ json: { route: 'done', response: 'Please include the patient phone number, e.g. #plan 000000000000 root canal 1500.' } }];\n  return [{ json: { route: 'append', sheet: 'Treatment Plans', row: { key: target + '-' + DateTime.now().toFormat('MMddHHmm'), time: nowTxt, phone: target, treatment: String(input.service || ''), price: String(input.items || ''), followups_sent: 0, status: 'open' },\n    response: 'Treatment plan saved for ' + target + ' (' + String(input.service || '') + '). Follow-up messages will start once the treatment_followup template is approved.' } }];\n}\nif (action === 'log_cancellation') {\n  const saved = String(input.saved || '').trim().toLowerCase();\n  return [{ json: {\n    route: 'log_cancellation',\n    time: DateTime.now().setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm'),\n    phone: phone,\n    service: String(input.service || ''),\n    reason: String(input.reason || ''),\n    saved: (saved.startsWith('y') || saved === 'true') ? 'yes' : 'no'\n  } }];\n}\n\n// ---------- estimate_price ----------\n// Built-in prices (fallback). With clinic_setup ON the Prices tab is used instead.\nlet PRICES = [\n  { name: \"Children's check-up (age 3+)\", price: 120, from: false, words: ['child', 'kid', 'children', 'طفل', 'أطفال', 'اطفال'] },\n  { name: 'Same-day emergency appointment', price: 250, from: false, words: ['emergency', 'urgent', 'طوارئ', 'طارئ', 'مستعجل'] },\n  { name: 'Root canal treatment', price: 1500, from: true, words: ['root', 'canal', 'عصب'] },\n  { name: 'Clear aligners', price: 9000, from: true, words: ['align', 'invisalign', 'brace', 'تقويم'] },\n  { name: 'Dental implant', price: 4500, from: true, words: ['implant', 'زراعة', 'زرع'] },\n  { name: 'In-clinic teeth whitening', price: 1200, from: false, words: ['whiten', 'bleach', 'تبييض', 'تبيض'] },\n  { name: 'Cleaning (scale and polish)', price: 350, from: false, words: ['clean', 'scale', 'polish', 'تنظيف', 'تنضيف'] },\n  { name: 'Filling (tooth-coloured)', price: 300, from: true, words: ['fill', 'حشو', 'حشوة', 'حشوات'] },\n  { name: 'Extraction', price: 300, from: true, words: ['extract', 'pull', 'removal', 'خلع'] },\n  { name: 'Consultation and check-up', price: 150, from: false, words: ['consult', 'check', 'exam', 'كشف', 'فحص', 'استشارة'] }\n];\nif (PRICE_ROWS.length) {\n  PRICES = PRICE_ROWS.map(function (r) {\n    return { name: String(r.name), price: Number(r.value), from: /^y/i.test(String(r.option || '')),\n      words: String(r.words || '').toLowerCase().split(',').map(function (w) { return w.trim(); }).filter(Boolean),\n      freeWithCleaning: /free.*clean/i.test(String(r.notes || '')) };\n  });\n}\nconst isCleaning = function (s) { return /clean|scale|تنظيف/i.test(s.name + ' ' + s.words.join(' ')); };\nconst isConsult = function (s) { return s.freeWithCleaning !== undefined ? s.freeWithCleaning : /^consult/i.test(s.name); };\n\nconst parts = String(input.items || '').split(/[,;\\n،]+/).map(function (s) { return s.trim(); }).filter(Boolean);\nconst lines = [];\nconst unknown = [];\nlet total = 0;\nlet anyFrom = false;\nlet hasCleaning = false;\nlet consultIndex = -1;\n\nfor (const p of parts) {\n  const qtyMatch = p.match(/(\\d+)/);\n  const qty = qtyMatch ? Math.max(1, parseInt(qtyMatch[1], 10)) : 1;\n  const text = p.toLowerCase();\n  const svc = PRICES.find(function (s) { return s.words.some(function (w) { return text.includes(w); }); });\n  if (!svc) { unknown.push(p); continue; }\n  const cost = svc.price * qty;\n  if (isCleaning(svc)) hasCleaning = true;\n  if (isConsult(svc)) consultIndex = lines.length;\n  if (svc.from) anyFrom = true;\n  total += cost;\n  lines.push({ qty: qty, svc: svc, cost: cost });\n}\n\nlet freeConsult = false;\nif (hasCleaning && consultIndex >= 0) {\n  freeConsult = true;\n  total -= lines[consultIndex].cost;\n  lines[consultIndex].cost = 0;\n}\n\nconst out = lines.map(function (l) {\n  const each = l.qty > 1 ? ' (' + CUR + ' ' + l.svc.price.toLocaleString('en-US') + ' each)' : '';\n  const price = l.cost === 0 && freeConsult ? 'FREE with the cleaning' : (l.svc.from ? 'from ' : '') + CUR + ' ' + l.cost.toLocaleString('en-US');\n  return '- ' + l.qty + ' x ' + l.svc.name + ': ' + price + each;\n});\n\nlet response = out.length ? out.join('\\n') + '\\n' + (anyFrom ? 'Estimated total: from ' + CUR + ' ' : 'Total: ' + CUR + ' ') + total.toLocaleString('en-US') : 'No services from the price list were recognised.';\nif (anyFrom) response += '\\n\"From\" prices are starting prices; the dentist confirms the final price after the check-up.';\nif (unknown.length) response += '\\nNot in the price list (a team member will confirm): ' + unknown.join(', ');\n// Instalments (switch: instalments): 0% over N months for totals above the minimum.\nif (on['instalments'] && total > INST_MIN) {\n  const monthly = Math.ceil(total / INST_MONTHS);\n  response += '\\n0% instalments: ' + (anyFrom ? 'from ' : '') + CUR + ' ' + monthly.toLocaleString('en-US') + '/month for ' + INST_MONTHS + ' months (no interest).';\n}\nreturn [{ json: { route: 'done', response: response } }];\n"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "a6e069a7-e443-4c9a-8367-4f381a446346",
+      "name": "Which Tool?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "send_location"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "send_location"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "running_late"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "running_late"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "log_cancellation"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "log_cancellation"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "append"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "append"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "upsert"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "upsert"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "read"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                }
+              },
+              "outputKey": "read"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "done"
+        }
+      }
+    },
+    {
+      "id": "7e07b1f0-e69d-4f1e-a2c1-2aee64112e6b",
+      "name": "Send Location Pin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/YOUR_PHONE_NUMBER_ID/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $json.phone, type: 'location', location: { latitude: $json.lat, longitude: $json.lng, name: $json.place, address: $json.address } }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "fce826af-16ca-4c0e-a20d-fde2d6aba885",
+      "name": "Pin Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response",
+              "name": "response",
+              "value": "={{ $json.messages ? 'Map pin sent to the patient (' + $('Check Switch and Run').first().json.place + ', ' + $('Check Switch and Run').first().json.address + '). Add one short friendly line, e.g. about parking.' : 'The map pin could not be sent. Give the address in text instead: ' + $('Check Switch and Run').first().json.address }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6dbbea89-a5b0-4213-b801-ebacdf770894",
+      "name": "Tool Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response",
+              "name": "response",
+              "value": "={{ $json.response }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "70a30302-6651-42ee-b9c5-b27838e2e3ab",
+      "name": "Find Patient (Late)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        384
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $('Tool Request').first().json.phone }}"
+            }
+          ]
+        },
+        "operation": "read",
+        "options": {
+          "returnFirstMatch": true
+        },
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "6df42dd2-c16e-4351-b503-74eabb17aa8b",
+      "name": "Late Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        384
+      ],
+      "parameters": {
+        "jsCode": "// Running late: compares the patient's arrival time with today's appointment and prepares the staff alert.\nconst input = $('Tool Request').first().json;\nconst p = $('Find Patient (Late)').first().json || {};\nconst phone = String(input.phone || '').replace(/\\D/g, '');\nconst minutes = Math.max(0, parseInt(String(input.minutes || '0').replace(/[^0-9]/g, ''), 10) || 0);\nconst now = DateTime.now().setZone('Asia/Dubai');\nconst eta = now.plus({ minutes: minutes });\nconst name = p.name || 'A patient';\nconst status = String(p.status || '').toLowerCase();\n\nlet start = null;\nif (p.appointment_start && (status === 'booked' || status === 'confirmed')) {\n  const s = DateTime.fromFormat(String(p.appointment_start), 'yyyy-MM-dd HH:mm', { zone: 'Asia/Dubai' });\n  if (s.isValid && s.hasSame(now, 'day')) start = s;\n}\n\nif (!start) {\n  return [{ json: {\n    alert: 'Running late: ' + name + ' (' + phone + ') says they will arrive in about ' + minutes + ' min (around ' + eta.toFormat('HH:mm') + '), but no appointment today was found. Please check.',\n    response: 'No appointment for today was found for this patient. Tell them kindly that the team has been informed, and ask which appointment they mean.'\n  } }];\n}\n\nconst lateBy = Math.round(eta.diff(start, 'minutes').minutes);\nconst appt = (p.service || 'appointment') + ' at ' + start.toFormat('HH:mm') + (p.dentist ? ' with ' + p.dentist : '');\nconst alert = 'Running late: ' + name + ' (' + phone + '), ' + appt + '. Expected arrival ' + eta.toFormat('HH:mm') + (lateBy > 0 ? ' (' + lateBy + ' min late).' : ' (on time).');\nlet response;\nif (lateBy <= 0) {\n  response = 'They will arrive on time for their ' + appt + '. Reassure them; the team knows they are on the way.';\n} else if (lateBy <= 15) {\n  response = 'They will be about ' + lateBy + ' minutes late for their ' + appt + '. That is within the 15-minute grace period. Reassure them warmly; the team has been told.';\n} else {\n  response = 'They will be about ' + lateBy + ' minutes late for their ' + appt + ', more than the 15-minute limit. Kindly explain that arriving more than 15 minutes late may need rescheduling, that the team has been told and will confirm if they can still be seen, and offer to find a new time with find_free_slots.';\n}\nreturn [{ json: { alert: alert, response: response } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "cfcffd6d-b0b0-419c-bcc5-3926081b1a24",
+      "name": "Alert Staff: Late",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        384
+      ],
+      "parameters": {
+        "messageType": "text",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Check Switch and Run').first().json.owner || '000000000000' }}",
+        "resource": "message",
+        "textBody": "={{ $json.alert }}"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "57f02978-6bdb-4fd7-8e00-58bce7031acb",
+      "name": "Late Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        384
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response",
+              "name": "response",
+              "type": "string",
+              "value": "={{ $('Late Check').first().json.response }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "mode": "manual"
+      }
+    },
+    {
+      "id": "f9cda835-6cdb-4f5e-8f15-462f3610108c",
+      "name": "Cancellation Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        576
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "time",
+              "name": "time",
+              "type": "string",
+              "value": "={{ $json.time }}"
+            },
+            {
+              "id": "phone",
+              "name": "phone",
+              "type": "string",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "id": "service",
+              "name": "service",
+              "type": "string",
+              "value": "={{ $json.service }}"
+            },
+            {
+              "id": "reason",
+              "name": "reason",
+              "type": "string",
+              "value": "={{ $json.reason }}"
+            },
+            {
+              "id": "saved",
+              "name": "saved",
+              "type": "string",
+              "value": "={{ $json.saved }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "mode": "manual"
+      }
+    },
+    {
+      "id": "11162ad1-1af7-44b6-bf4d-de294de332b0",
+      "name": "Log Cancellation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        576
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "schema": [],
+          "value": {}
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "append",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "0b31e4e4-e3be-4735-9c46-646d4c6c4749",
+      "name": "Logged Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1344,
+        576
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response",
+              "name": "response",
+              "type": "string",
+              "value": "={{ $json.error ? 'Could not log the reason, but continue normally.' : 'Cancellation reason logged.' }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "mode": "manual"
+      }
+    },
+    {
+      "id": "75ff5383-c10b-4b95-bf1f-48e000a7b474",
+      "name": "Row To Append",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        800
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json.row }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "c477078e-186c-49f4-a007-2d29c12633ef",
+      "name": "Append Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        800
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "schema": [],
+          "value": {}
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "append",
+        "options": {
+          "handlingExtraData": "insertInNewColumn"
+        },
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "99a511d7-a927-4a13-8990-8e5af5cba880",
+      "name": "Row To Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        992
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json.row }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "1f462c7e-c339-4edd-8e83-ec6a046d0990",
+      "name": "Update Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        992
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": [
+            "key"
+          ],
+          "schema": [],
+          "value": {}
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "appendOrUpdate",
+        "options": {
+          "handlingExtraData": "insertInNewColumn"
+        },
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6a6d7f92-47ac-468a-b490-89b4f17918bb",
+      "name": "Notify Patient?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        896
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ !!$('Check Switch and Run').first().json.notify_phone }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "62a79e68-c1aa-4442-a7f6-20250afebb95",
+      "name": "Notify Patient",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        832
+      ],
+      "parameters": {
+        "messageType": "text",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ $('Check Switch and Run').first().json.notify_phone }}",
+        "resource": "message",
+        "textBody": "={{ $('Check Switch and Run').first().json.notify_text }}"
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "54dca41f-44bb-4a71-bab6-125de04339fd",
+      "name": "Write Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1792,
+        896
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response",
+              "name": "response",
+              "type": "string",
+              "value": "={{ $('Check Switch and Run').first().json.response + ($json.error ? ' (Note: the WhatsApp message to the patient could not be sent, probably because they have not messaged in the last 24 hours. It will work once the approval_update / request_ready templates are approved.)' : '') }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "mode": "manual"
+      }
+    },
+    {
+      "id": "d442abe4-d1fc-4e2d-8520-fde43abcfa3e",
+      "name": "Read Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        1184
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "read",
+        "options": {},
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a9402981-a8f6-42f4-a925-bb1190095e03",
+      "name": "Answer From Tab",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        1184
+      ],
+      "parameters": {
+        "jsCode": "// Builds the tool answer from a sheet tab (knowledge base search, approval status, open requests).\nconst req = $('Check Switch and Run').first().json;\nconst input = $('Tool Request').first().json;\nconst rows = $input.all().map(function (i) { return i.json || {}; }).filter(function (r) { return !r.error && Object.keys(r).length; });\nconst digits = function (v) { return String(v || '').replace(/\\D/g, ''); };\nconst action = String(input.action || '');\nlet response = '';\n\nif (action === 'search_knowledge') {\n  const q = String(req.query || '').toLowerCase();\n  const scored = rows.map(function (r) {\n    const kws = String(r.keywords || '').toLowerCase().split(',').map(function (k) { return k.trim(); }).filter(Boolean);\n    let score = 0;\n    kws.forEach(function (k) { if (q.includes(k)) score += k.split(' ').length + 1; });\n    String(r.topic || '').toLowerCase().split(/[^a-z؀-ۿ]+/).forEach(function (w) { if (w.length > 3 && q.includes(w)) score += 1; });\n    return { r: r, score: score };\n  }).filter(function (x) { return x.score > 0; }).sort(function (a, b) { return b.score - a.score; }).slice(0, 2);\n  response = scored.length\n    ? scored.map(function (x) { return x.r.topic + ': ' + x.r.answer; }).join('\\n')\n    : 'Nothing about this in the knowledge base. Tell the patient a team member will confirm soon, call alert_staff, and call log_unanswered with the question.';\n} else if (action === 'approval_status') {\n  const mine = rows.filter(function (r) { return digits(r.phone) === digits(input.phone); });\n  if (!mine.length) response = 'No insurance approval request found for this patient yet. Offer to check with the team (call alert_staff).';\n  else {\n    const a = mine[mine.length - 1];\n    response = 'Insurance approval for ' + (a.treatment || 'their treatment') + (a.insurer ? ' with ' + a.insurer : '') + ': ' + (a.status || 'pending') + ' (last update ' + (a.updated_at || '') + ').' + (String(a.status).toLowerCase() === 'approved' ? ' Offer to book the appointment.' : '');\n  }\n} else if (action === 'owner_requests_list') {\n  // Closed requests (ready, done or closed) are not listed.\n  const open = rows.filter(function (r) { return ['ready', 'done', 'closed'].indexOf(String(r.status || '').toLowerCase().trim()) < 0; });\n  response = open.length ? 'Open requests:\\n' + open.map(function (r) { return r.key + ' | ' + r.phone + ' | ' + r.type + ' | ' + (r.details || '') + ' | since ' + r.time; }).join('\\n') : 'No open requests.';\n}\nreturn [{ json: { response: response } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "eb9a33f6-ca9d-4405-a9c2-387ac134f7ea",
+      "name": "Get Setup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        336,
+        272
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "7a68cf6e-3696-46bc-bb2d-1cc2607c4003",
+      "name": "Test Dry Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Test phones (9715000009...) come from the Test Suite: answer normally but never write to the Sheet or message anyone.\nconst r = $input.first().json || {};\nconst ph = String($('Tool Request').first().json.phone || '').replace(/\\D/g, '');\nif (/^000000000000/.test(ph) && ['append', 'upsert', 'log_cancellation', 'running_late'].indexOf(String(r.route)) >= 0) {\n  const resp = r.response || (r.route === 'running_late' ? 'The team has been told they are running late (test mode).' : r.route === 'log_cancellation' ? 'Cancellation reason logged (test mode).' : 'Saved (test mode).');\n  return [{ json: { route: 'done', response: resp } }];\n}\nreturn [{ json: r }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    }
+  ],
+  "connections": {
+    "Tool Request": {
+      "main": [
+        [
+          {
+            "node": "Read Noor Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Location Pin": {
+      "main": [
+        [
+          {
+            "node": "Pin Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Which Tool?": {
+      "main": [
+        [
+          {
+            "node": "Send Location Pin",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Patient (Late)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancellation Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Row To Append",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Row To Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read Tab",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Patient (Late)": {
+      "main": [
+        [
+          {
+            "node": "Late Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Late Check": {
+      "main": [
+        [
+          {
+            "node": "Alert Staff: Late",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Staff: Late": {
+      "main": [
+        [
+          {
+            "node": "Late Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancellation Row": {
+      "main": [
+        [
+          {
+            "node": "Log Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Cancellation": {
+      "main": [
+        [
+          {
+            "node": "Logged Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Row To Append": {
+      "main": [
+        [
+          {
+            "node": "Append Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Row": {
+      "main": [
+        [
+          {
+            "node": "Notify Patient?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Row To Update": {
+      "main": [
+        [
+          {
+            "node": "Update Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Row": {
+      "main": [
+        [
+          {
+            "node": "Notify Patient?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Patient?": {
+      "main": [
+        [
+          {
+            "node": "Notify Patient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Patient": {
+      "main": [
+        [
+          {
+            "node": "Write Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Tab": {
+      "main": [
+        [
+          {
+            "node": "Answer From Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Noor Settings": {
+      "main": [
+        [
+          {
+            "node": "Get Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Setup": {
+      "main": [
+        [
+          {
+            "node": "Check Switch and Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Switch and Run": {
+      "main": [
+        [
+          {
+            "node": "Test Dry Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Dry Run": {
+      "main": [
+        [
+          {
+            "node": "Which Tool?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

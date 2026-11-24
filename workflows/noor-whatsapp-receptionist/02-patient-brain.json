@@ -1,0 +1,2405 @@
+{
+  "name": "Noor – Patient Brain",
+  "nodes": [
+    {
+      "id": "11ee08d1-186d-43c6-91ec-2e8eb51d3e3e",
+      "name": "Brain Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "phone",
+              "type": "string"
+            },
+            {
+              "name": "profile_name",
+              "type": "string"
+            },
+            {
+              "name": "type",
+              "type": "string"
+            },
+            {
+              "name": "text",
+              "type": "string"
+            },
+            {
+              "name": "patient",
+              "type": "string"
+            },
+            {
+              "name": "test_mode",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0f3ff0fb-931e-494a-b5db-0b2c6c3f5c19",
+      "name": "Get Settings",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "b5859688-6639-4021-838e-cd696499e2e8",
+      "name": "Get Knowledge",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "e1c467d6-c81f-4396-9d68-15dd1dc6c69d",
+      "name": "Get History",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "phone",
+              "keyValue": "={{ $('Brain Input').first().json.phone }}"
+            }
+          ]
+        },
+        "limit": 12,
+        "matchType": "allConditions",
+        "operation": "get",
+        "orderBy": true,
+        "orderByColumn": "createdAt",
+        "orderByDirection": "DESC",
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "4e2e6f95-2888-4aa5-947e-a000000000000b",
+      "name": "Noor",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "options": {
+          "enableStreaming": false,
+          "maxIterations": 8,
+          "returnIntermediateSteps": true,
+          "systemMessage": "={{ $json.system }}"
+        },
+        "promptType": "define",
+        "text": "={{ $json.prompt }}"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "94bc3103-bd4a-4ea3-91cd-5f798be24905",
+      "name": "Claude Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        900,
+        260
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Prepare').first().json.model }}"
+        },
+        "options": {
+          "maxTokensToSample": 1024,
+          "temperature": 0.3
+        }
+      }
+    },
+    {
+      "id": "5c77e97d-fe2e-40f9-b4b1-2844425cb356",
+      "name": "find_free_slots",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        260
+      ],
+      "parameters": {
+        "description": "Returns free appointment times for a service on a date.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "date",
+              "id": "date",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "days",
+              "id": "days",
+              "required": false,
+              "type": "number"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "find_slots",
+            "date": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('date', 'First day, YYYY-MM-DD') }}",
+            "days": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('days', 'Number of days 1-7', 'number') }}",
+            "phone": "owner",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('service', 'Service, or consultation') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "21cb4db6-40cb-4765-a0e6-d871688f32ca",
+      "name": "book_appointment",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1170,
+        260
+      ],
+      "parameters": {
+        "description": "Books an appointment in the clinic calendar and saves the patient. Checks the slot is still free. Returns the confirmation to give the patient.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "start",
+              "id": "start",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "dentist",
+              "id": "dentist",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "name",
+              "id": "name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "language",
+              "id": "language",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "new_or_returning",
+              "id": "new_or_returning",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "insurance",
+              "id": "insurance",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "book",
+            "dentist": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('dentist', 'Dentist name from find_free_slots, or empty') }}",
+            "insurance": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('insurance', 'yes, no or unknown') }}",
+            "language": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('language', 'en or ar') }}",
+            "name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('name', 'Patient full name') }}",
+            "new_or_returning": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('new_or_returning', 'new or returning') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('service', 'Service to book') }}",
+            "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start', 'Chosen start time, YYYY-MM-DD HH:mm in Dubai time') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "b959e248-4355-47bf-a688-e6335763c370",
+      "name": "reschedule_appointment",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1300,
+        260
+      ],
+      "parameters": {
+        "description": "Moves the patient’s existing booking to a new start time (checks it is free).",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "start",
+              "id": "start",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "dentist",
+              "id": "dentist",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "reschedule",
+            "dentist": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('dentist', 'Dentist name from find_free_slots, or empty') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}",
+            "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start', 'New start time, YYYY-MM-DD HH:mm in Dubai time') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "c43d0b82-bf54-48ac-9c3c-f19f197b2768",
+      "name": "cancel_appointment",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1430,
+        260
+      ],
+      "parameters": {
+        "description": "Cancels the patient’s existing booking and frees the slot.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "cancel",
+            "phone": "={{ $('Brain Input').first().json.phone }}",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('reason', 'Short reason for cancelling, or empty') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "ee219da5-9912-4504-911c-87c237f0a2ae",
+      "name": "my_booking",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1560,
+        260
+      ],
+      "parameters": {
+        "description": "Shows the patient’s upcoming booking, if any.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Booking Engine",
+          "mode": "id",
+          "value": "Hx7H42notykcQesU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "dentist",
+              "id": "dentist",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "my_booking",
+            "dentist": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('note', 'Leave empty') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "c0f6a37e-5b24-4f5b-a20d-61ef28231bb7",
+      "name": "save_patient",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1690,
+        260
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "name",
+              "id": "name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "language",
+              "id": "language",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "new_or_returning",
+              "id": "new_or_returning",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "insurance",
+              "id": "insurance",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "notes",
+              "id": "notes",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "last_message_at",
+              "id": "last_message_at",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "insurance": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('insurance', 'yes, no or unknown') }}",
+            "language": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('language', 'en or ar') }}",
+            "last_message_at": "={{ $now.setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm') }}",
+            "name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('name', 'Patient full name, or empty') }}",
+            "new_or_returning": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('new_or_returning', 'new, returning or empty') }}",
+            "notes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('notes', 'Short useful note for staff, or empty') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('service', 'Service of interest, or empty') }}",
+            "status": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('status', 'lead, confirmed, not_now or human') }}"
+          }
+        },
+        "descriptionType": "manual",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "appendOrUpdate",
+        "options": {
+          "cellFormat": "RAW"
+        },
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "toolDescription": "Saves or updates details of this patient (matched on phone) when they have not booked yet, or records a status change (lead, confirmed, not_now, human). Never use it to book."
+      }
+    },
+    {
+      "id": "639ff6cb-4457-4cfe-8c6a-5da1320f95ed",
+      "name": "estimate_price",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1820,
+        260
+      ],
+      "parameters": {
+        "description": "Calculates an itemised price estimate in AED for one or more services with quantities (e.g. 3 fillings and a cleaning).",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "items",
+              "id": "items",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "language",
+              "id": "language",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "estimate_price",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('items', 'Services and quantities, comma-separated as service:quantity, e.g. filling:3, cleaning:1') }}",
+            "language": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('language', 'Reply language: en or ar') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "9fa17752-d906-413f-8877-d90dcdbf15ce",
+      "name": "send_location",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1950,
+        260
+      ],
+      "parameters": {
+        "description": "Sends the patient a WhatsApp map pin with the clinic location. Use when they ask where the clinic is or for directions.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "items",
+              "id": "items",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "language",
+              "id": "language",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "send_location",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('note', 'Leave empty') }}",
+            "language": "",
+            "phone": "={{ $('Brain Input').first().json.phone }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "0351b0ff-e4de-4c5e-b970-40f5d9a06983",
+      "name": "log_cancellation",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2080,
+        260
+      ],
+      "parameters": {
+        "description": "Logs why a patient cancelled, or that they kept/moved their appointment after you offered alternatives. Call once at the end of a cancel conversation.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "reason",
+              "id": "reason",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "saved",
+              "id": "saved",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "log_cancellation",
+            "phone": "={{ $('Brain Input').first().json.phone }}",
+            "reason": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('reason', 'Why they wanted to cancel, in a few words, or not given') }}",
+            "saved": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('saved', 'yes if they kept or moved the appointment, no if they cancelled') }}",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('service', 'The appointment service') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "5886d787-bf50-4bfc-991c-8a8d44042e02",
+      "name": "running_late",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2210,
+        260
+      ],
+      "parameters": {
+        "description": "Tells the clinic team that the patient is running late and checks today's appointment. Returns what to tell the patient.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "minutes",
+              "id": "minutes",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "running_late",
+            "minutes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('minutes', 'Minutes from now until the patient arrives, as a number') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "d9838040-0fcf-414d-b1b0-79d432266de5",
+      "name": "search_knowledge",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2340,
+        260
+      ],
+      "parameters": {
+        "description": "Searches the clinic knowledge base (aftercare, insurers, payment, parking, children, pregnancy, X-rays, veneers, wisdom teeth, sensitivity, policies). Returns the approved answer to use.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "items",
+              "id": "items",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "search_knowledge",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('query', 'Short English keywords of the question, e.g. after extraction bleeding') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "22de1903-a5c9-49ee-9eda-9c31b5d545aa",
+      "name": "log_request",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2470,
+        260
+      ],
+      "parameters": {
+        "description": "Logs a patient document or admin request (invoice, receipt, X-rays, sick-leave note, medical report, insurance claim form, data deletion) and returns a request number.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "items",
+              "id": "items",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "service",
+              "id": "service",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "log_request",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('details', 'Short details, e.g. which visit or date') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}",
+            "service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('type', 'invoice, receipt, x-rays, sick leave note, medical report, insurance claim form, data deletion, family booking, waitlist, or other') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "cd9537fc-e2a5-4494-b165-63e32b3723fe",
+      "name": "approval_status",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2600,
+        260
+      ],
+      "parameters": {
+        "description": "Checks the status of this patient's insurance pre-approval (pending, approved or rejected).",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "items",
+              "id": "items",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "approval_status",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('note', 'Leave empty') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "7d980000-7cf5-4b7b-8855-c4df9c54e99f",
+      "name": "alert_staff",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2730,
+        260
+      ],
+      "parameters": {
+        "description": "Sends a short WhatsApp note to the clinic team (hand-overs, complaints, cancellations, questions you cannot answer) and logs it.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Noor – Extra Tools",
+          "mode": "id",
+          "value": "pWZbExd8NiFPKNfM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "action",
+              "id": "action",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "items",
+              "id": "items",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "action": "alert_staff",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('alert', 'Short message for the clinic team explaining what the patient needs') }}",
+            "phone": "={{ $('Brain Input').first().json.phone }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "0e2f213a-6d41-49c3-ae63-5e5f3b8ded5e",
+      "name": "Noor Failed",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        220
+      ],
+      "parameters": {
+        "errorMessage": "Noor could not answer this message"
+      }
+    },
+    {
+      "id": "569b056f-9303-4a09-835f-a66438ca8bf8",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Builds Noor's prompt for THIS message: a short core prompt + only the topic notes this message needs.\n// Inputs: Brain Input (message), Get Settings / Get Knowledge / Get History (data tables).\nconst input = $('Brain Input').first().json;\nconst phone = String(input.phone || '');\nconst text = String(input.text || '');\nconst type = String(input.type || 'text');\nlet patient = {};\ntry { patient = typeof input.patient === 'string' ? JSON.parse(input.patient || '{}') : (input.patient || {}); } catch (e) { patient = {}; }\n\n// ---------- switches (Noor Settings, synced from the Sheet) ----------\nconst settingsRows = $('Get Settings').all().map(function (i) { return i.json || {}; }).filter(function (r) { return r.feature; });\nconst on = {};\nsettingsRows.forEach(function (r) { on[String(r.feature).trim()] = String(r.enabled).trim().toUpperCase() === 'TRUE'; });\n\n// ---------- recent conversation (last 12 lines, oldest first) ----------\nconst hist = $('Get History').all().map(function (i) { return i.json || {}; }).filter(function (r) { return r.role && r.text; }).reverse();\nconst lastNoor = hist.filter(function (r) { return r.role === 'noor'; }).pop();\nconst lastIntents = lastNoor ? String(lastNoor.intents || '').split(',').filter(Boolean) : [];\n\n// ---------- what is this message about? ----------\nconst T = {\n  booking: /\\b(book|booking|appointment|appt|slot|available|availability|schedule|tomorrow|today|tonight|next week|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|when can|free time)\\b|\\d{1,2}\\s*(am|pm)\\b|\\d{1,2}:\\d{2}|احجز|أحجز|حجز|موعد|ميعاد|بكرة|بكره|بكرا|غدا|غداً|النهارده|اليوم|الساعة|الصبح|المسا|العصر|السبت|الأحد|الاحد|الاثنين|الإثنين|الثلاثاء|الأربعاء|الاربعاء|الخميس|الجمعة|बुक|अपॉइंटमेंट|कल/i,\n  cancel: /cancel|reschedul|postpone|move my|change my (appointment|booking|time)|can'?t make it|cannot (come|make)|الغ|إلغ|ألغ|كنسل|تأجيل|اأجل|أأجل|اغير الميعاد|أغير الموعد|تغيير الموعد|مش هقدر|ما اقدر|ما أقدر/i,\n  prices: /price|cost|how much|fee|charge|pay|payment|instal|cash|card|apple pay|aed|dirham|cheap|expensive|discount|offer|whiten|bleach|clean|scale|polish|filling|root canal|implant|aligner|invisalign|braces|veneer|crown|extraction|check-?up|consult|بكام|(?:^|\\s)كام(?:\\s|$)|(?:^|\\s)كم(?:\\s|$)|سعر|السعر|تكلفة|فلوس|درهم|تقسيط|كاش|تبييض|تنظيف|حشو|عصب|زراع|تقويم|خلع|كشف|فينير|تركيب|कितना|कीमत|खर्च|सफेद/i,\n  emergency: /pain|hurt|ache|swell|swollen|bleed|broken|broke|chipped|cracked|knocked|emergency|urgent|abscess|fever|ألم|(?:^|\\s)الم(?:\\s|$)|وجع|بيوجع|يوجع|ورم|متورم|نزيف|مكسور|انكسر|طوارئ|مستعجل|ضروري|दर्द|सूजन/i,\n  insurance: /insur|daman|thiqa|axa|bupa|cigna|nextcare|neuron|metlife|approval|approved|pre-?approval|claim|coverage|covered|تأمين|التامين|تامين|ضمان|ثقة|موافقة|تغطية|बीमा/i,\n  info: /where|location|address|map|direction|parking|park|open|close|hours|timing|female|doctor|dentist|who is|bring|policy|policies|kids|children|child|baby|فين|وين|عنوان|الموقع|لوكيشن|موقف|باركن|مواعيد العمل|دكتور|دكتورة|طبيب|طبيبة|اطفال|أطفال|ابني|بنتي/i,\n  requests: /invoice|receipt|report|x-?ray|sick (leave|note)|certificate|document|claim form|stop messag|unsubscribe|delete (my|me)|my data|فاتورة|إيصال|ايصال|تقرير|أشعة|اشعة|اجازة|إجازة|شهادة|توقف|لا تراسلني|امسح|احذف/i,\n  nervous: /scared|nervous|afraid|anxious|anxiety|fear|phobia|panic|terrified|worried|خايف|خايفة|بخاف|قلقان|قلقانة|مرعوب|خوف|متوتر|متوترة/i,\n  late: /running late|be late|i'?m late|on my way|traffic|minutes away|be there in|متأخر|متاخر|هتأخر|هتاخر|في الطريق|بالطريق|زحمة/i,\n  family: /\\b(son|daughter|kid|kids|child|children|wife|husband|mother|father|mom|mum|dad|sister|brother|family)\\b|ابني|ابنى|بنتي|ولدي|عيالي|اطفالي|أطفالي|مراتي|زوجتي|جوزي|زوجي|أمي|امي|ماما|بابا|أختي|اختي|أخوي|اخويا|बेटा|बेटी/i,\n  smalltalk: /^\\W*(hi|hello|hey|thanks|thank you|thx|ok|okay|great|perfect|bye|good (morning|evening|night)|السلام عليكم|سلام|مرحبا|مرحباً|اهلا|أهلا|شكرا|شكراً|تسلم|تمام|ماشي|مع السلامة|صباح الخير|مساء الخير|رمضان كريم|عيد مبارك|धन्यवाद)\\W*$/i,\n  aftercare: /after (my|the|a|whiten|clean|fill|extract|root|implant)|aftercare|avoid|can i eat|sensitive|sensitivity|bleeding gums|bad breath|pregnan|safe|بعد ال|بعد ما|حساسية|حامل|رائحة/i\n};\nconst found = Object.keys(T).filter(function (k) { return T[k].test(text); });\nif (type === 'image') found.push('photo');\nif (type === 'audio' && !found.length) found.push('booking', 'prices', 'info');\n\n// Knowledge Base: approved answers whose keywords appear in this message.\nlet knowledge = '';\nlet kbMatched = false;\nif (on.knowledge_base) {\n  const q = text.toLowerCase();\n  const scored = $('Get Knowledge').all().map(function (i) { return i.json || {}; }).filter(function (r) { return r.topic && r.answer; }).map(function (r) {\n    let score = 0;\n    String(r.keywords || '').toLowerCase().split(',').map(function (k) { return k.trim(); }).filter(Boolean).forEach(function (k) { if (q.includes(k)) score += k.split(' ').length + 1; });\n    return { r: r, score: score };\n  }).filter(function (x) { return x.score > 0; }).sort(function (a, b) { return b.score - a.score; }).slice(0, 2);\n  if (scored.length) {\n    kbMatched = true;\n    found.push('knowledge');\n    knowledge = scored.map(function (x) { return '- ' + x.r.topic + ': ' + x.r.answer; }).join('\\n');\n  }\n}\n\n// Short follow-ups (\"4pm please\", \"Mariam, no insurance\") keep the topics of the previous turn.\nlet intents = found.slice();\nlastIntents.forEach(function (k) { if (intents.indexOf(k) < 0 && ['booking', 'cancel', 'emergency', 'insurance', 'family', 'requests', 'prices'].indexOf(k) >= 0) intents.push(k); });\nif (!intents.length) intents = ['general'];\nif (intents.length === 1 && intents[0] === 'smalltalk') intents = ['smalltalk'];\nconst has = function (k) { return intents.indexOf(k) >= 0; };\nconst general = has('general');\n\n// ---------- dates (Dubai) ----------\nconst AR_DAYS = { 1: 'الاثنين', 2: 'الثلاثاء', 3: 'الأربعاء', 4: 'الخميس', 5: 'الجمعة', 6: 'السبت', 7: 'الأحد' };\nconst CLOSED = ['2026-12-02', '2026-12-03', '2027-01-01'];\nconst now = DateTime.now().setZone('Asia/Dubai');\nconst today = now.startOf('day');\nconst calendar = [];\nfor (let i = 0; i < 14; i++) {\n  const d = today.plus({ days: i });\n  const ymd = d.toFormat('yyyy-MM-dd');\n  const hours = CLOSED.indexOf(ymd) >= 0 ? 'CLOSED' : (d.weekday === 5 ? 'open 14:00-21:00 only' : 'open 9:00-21:00');\n  calendar.push('- ' + d.toFormat('cccc d LLLL yyyy') + ' = ' + ymd + ' = ' + AR_DAYS[d.weekday] + (i === 0 ? ' (today)' : (i === 1 ? ' (tomorrow)' : '')) + ' | ' + hours);\n}\n\n// ---------- custom instructions written in the Noor Settings tab ----------\nconst ROW_TOPIC = { knowledge_base: 'knowledge', aftercare: 'knowledge', unanswered_log: 'core', dental_photos: 'photo', more_languages: 'core', cosmetic_discovery: 'prices', privacy_requests: 'requests', request_tracker: 'requests', approval_tracker: 'insurance', family_bookings: 'booking', waitlist: 'booking' };\nconst custom = {};\nsettingsRows.forEach(function (r) {\n  const k = String(r.feature).trim();\n  const txt = String(r.instructions || '').trim();\n  if (!txt || !on[k]) return;\n  const topic = ROW_TOPIC[k] || 'core'; // new rows the owner adds always apply\n  (custom[topic] = custom[topic] || []).push('- ' + txt);\n});\nconst extra = function (topic) { return (custom[topic] || []).join('\\n'); };\n\n// ---------- core prompt (always) ----------\nconst arabic = /[؀-ۿ]/.test(text);\nconst core = [\n  'You are Noor, the WhatsApp assistant for BrightSmile Dental in Dubai (a fictional demo clinic).',\n  'Now: ' + now.toFormat('cccc d LLLL yyyy, HH:mm') + ' (Dubai time, UTC+4). Today = ' + today.toFormat('yyyy-MM-dd') + ', tomorrow = ' + today.plus({ days: 1 }).toFormat('cccc yyyy-MM-dd') + '.',\n  'Patient WhatsApp number: ' + phone + '. WhatsApp profile name: ' + String(input.profile_name || '') + '.',\n  'Patient record: ' + (Object.keys(patient).length ? JSON.stringify(patient) : 'new patient, no record yet'),\n  '',\n  'LANGUAGE',\n  '- Reply in the language of the patient’s LATEST message: English by default; Arabic if they write Arabic (match their Gulf, Egyptian or simple standard Arabic and never mix dialects); any other language in that language. Write prices and times with Western digits.',\n  '- Messages starting with [Voice note ...] came from a voice message: answer exactly what they asked, every question in order, in the language spoken. Never say you cannot hear voice notes. Only if the transcript is (empty), ask them kindly to resend or type it.',\n  '',\n  'STYLE',\n  '- WhatsApp: under 60 words, warm and professional, one question at a time, at most one emoji. Bold is *single asterisks*; no headings, tables or [links](...).',\n  on.tone_small_talk ? '- Sound like a friendly human receptionist. Match their tone and length. Greet only once per conversation (good morning/evening by Dubai time). Small talk gets one natural line, e.g. \"رمضان كريم\" → \"الله أكرم\", \"شكراً\" → \"العفو، تحت أمرك\". In Arabic do not guess gender: use حضرتك or neutral/masculine forms unless they are clearly female. Do not start two replies with the same opening.' : '',\n  '',\n  'RULES',\n  '- Use only the information in this prompt and your tools. If you do not have the answer, say a team member will confirm and call alert_staff. Never invent prices, availability, dentists or policies. Never diagnose or give medical advice.',\n  '- Never say something is booked, moved, cancelled or approved unless a tool confirmed it in this turn.',\n  '- If asked whether you are a bot, an AI or a real person: you are BrightSmile’s virtual assistant (an AI); offer a team member (call alert_staff if they want one).',\n  '- Hand over to a human (call alert_staff and say a team member will reply soon) when they ask for a person, are upset or complaining, it is about a bill or a treatment result, or you cannot help. Then call save_patient with status \"human\" (if they already have a booking, keep their status and add the reason to the notes).',\n  '- Do not ask for ID numbers, card numbers or detailed medical history in chat.',\n  '- Never work out dates yourself: use today/tomorrow above and the calendar in the booking notes.',\n  extra('core'),\n  '',\n  'CLINIC BASICS',\n  'BrightSmile Dental, Jumeirah, Dubai (demo address). Free parking. Open Saturday-Thursday 9:00-21:00, Friday 14:00-21:00; 30-minute slots, last appointment 20:30.',\n  'Dentists: Dr. Sara Haddad (general and cosmetic, whitening; female), Dr. Omar Nasser (implants, extractions, oral surgery), Dr. Lina Farouk (orthodontics, clear aligners, children from age 3; female). All speak English and Arabic.',\n  'Cash, card and Apple Pay accepted. Most major UAE insurance plans accepted (coverage confirmed by the team).',\n  '',\n  'TOOLS (trust tool answers over your own guesses; if a tool says no or something is missing, explain kindly and offer alternatives)',\n  '- find_free_slots: free times for a service on a date. Never offer a time it did not return, and name only the dentist it returned.',\n  '- book_appointment, reschedule_appointment, cancel_appointment, my_booking: the real calendar.',\n  '- save_patient: saves a patient who has NOT booked (status \"lead\") or a status change (\"confirmed\", \"not_now\", \"human\"). Never use it to book. Send every field you know.',\n  '- alert_staff: short WhatsApp note to the clinic team.',\n  '- Other tools are explained in the topic notes below.'\n].filter(function (l) { return l !== null && l !== undefined; }).join('\\n');\n\n// ---------- topic notes (only what this message needs) ----------\nconst notes = [];\nif (has('booking') || has('family') || general) {\n  notes.push([\n    'BOOKING',\n    '1. Find the service (if unsure, suggest a consultation and check-up). 2. Ask the preferred day and time of day. 3. Check the day against the opening hours in the calendar below (Friday opens 14:00, last appointment 20:30), then call find_free_slots and offer up to 3 times near what they asked, with the dentist the tool returned. 4. Ask their full name if unknown, new or returning, and whether they will use insurance; once you know name and service, call save_patient with status \"lead\". 5. When they choose a time, call book_appointment and confirm date, time, dentist and location using the tool’s answer.',\n    '- If they will use insurance, ask for a photo of the front of their insurance card (read automatically).',\n    '- Reminder buttons: \"Confirm\" = save_patient status \"confirmed\" and thank them; \"Reschedule\" = help pick a new time; \"Not now\" = save_patient status \"not_now\".',\n    'Calendar (Dubai): \"this Thursday\" means the first Thursday after today; \"next week\" means 7 days later.',\n    calendar.join('\\n'),\n    extra('booking')\n  ].join('\\n'));\n}\nif (has('family')) notes.push('FAMILY BOOKING: if the patient record shows an upcoming booking (status booked or confirmed), never call book_appointment or reschedule_appointment for the family member (it would replace that booking): collect name, age (for a child), service and preferred time, then call log_request with type \"family booking\" and give the request number. For a child use service \"children’s check-up\" in find_free_slots (Dr. Lina Farouk). Without an upcoming booking, book normally.');\nif (has('cancel')) {\n  notes.push([\n    'CANCEL OR MOVE',\n    '- To move a booking use reschedule_appointment. To cancel use cancel_appointment, then alert_staff with a short note. If the tool says it was late, remind them kindly of the 24-hour notice policy.',\n    on.save_cancellation ? '- Before cancelling, ask once what made them cancel and in the same reply offer 2 concrete alternative times (call find_free_slots first). If they pick one, reschedule instead. Cancel only if they still want to; if they insist straight away, do not push. Afterwards call log_cancellation with the service, the reason (or \"not given\") and saved = yes if they kept or moved it, no if they cancelled.' : '',\n    'Policies: 24 hours’ notice for changes; more than 15 minutes late may need rescheduling.'\n  ].filter(Boolean).join('\\n'));\n}\nif (has('prices') || general) {\n  notes.push([\n    'PRICES (AED)',\n    'Consultation and check-up 150 (FREE when booked with a cleaning; the cleaning itself is never free) | Cleaning (scale and polish) 350 | In-clinic whitening 1,200 (about 90 min) | Filling from 300 per tooth | Root canal from 1,500 | Extraction from 300 (surgical priced at consultation) | Implant from 4,500 per implant (consultation first) | Clear aligners from 9,000 (consultation first) | Children’s check-up (age 3+) 120 | Same-day emergency 250.',\n    '\"From\" prices depend on the dentist’s assessment; never promise a final price.',\n    on.price_estimator ? '- Several services or a quantity (e.g. \"3 fillings and a cleaning\"): call estimate_price and share the itemised total it returns.' : '',\n    on.instalments ? '- Instalments: only when a price or total is MORE than AED 2,000, add one line about 0% instalments over 6 months with the monthly amount (implant from AED 750/month, aligners from AED 1,500/month). Never for whitening, root canal alone, cleaning, fillings, extraction or check-ups.' : '',\n    extra('prices')\n  ].filter(Boolean).join('\\n'));\n}\nif (on.cosmetic_discovery && /whiten|bleach|veneer|align|invisalign|braces|smile|makeover|implant|crown|تبييض|ابتسام|فينير|تقويم|زراع|सफेद|मुस्कान/i.test(text) && /price|cost|how much|want|interested|thinking|consider|بكام|كام|كم|سعر|عايز|عاوز|أبي|ابي|ابغى|حابب|ودي|कितना|खर्च|चाहिए|करवाने/i.test(text) && !/after |aftercare|yesterday|already had|بعد ال|امبارح|أمس/i.test(text)) {\n  notes.push('COSMETIC ENQUIRY (this message): give the price, then ask up to 2 short friendly questions: what they would like to change about their smile, and whether they have a date in mind (wedding, event). Do not ask them to book in this reply unless they asked to book. When they answer, suggest a consultation and save their answers in the notes with save_patient (keep their status).');\n}\nif (has('emergency')) {\n  notes.push('EMERGENCY: severe pain, swelling, a broken or knocked-out tooth: in the same turn call find_free_slots for today (service: emergency) and offer the 2 earliest times, and call alert_staff with a short note. If nothing is free today, say a team member will call them back urgently. Difficulty breathing or swallowing, heavy bleeding that will not stop or a serious injury: tell them to call 998 or go to the nearest emergency department now; do not book these.');\n}\nif (has('insurance')) {\n  notes.push(['INSURANCE', '- Coverage depends on the plan: ask for a photo of the front of their insurance card; the team confirms coverage before the visit.', on.approval_tracker ? '- Approval questions (\"is my approval ready?\"): call approval_status and tell them what it says; if approved, offer to book.' : '', extra('insurance')].filter(Boolean).join('\\n'));\n}\nif (has('info') || general) {\n  notes.push([\n    'CLINIC INFO',\n    on.location_pin ? '- Location, address, directions or map: call send_location every time they ask (it sends a map pin), then one short line about free parking.' : '- Location: Jumeirah, Dubai (demo address), free parking.',\n    '- New patients: arrive 10 minutes early with ID and insurance card. Under-18s come with a parent or guardian.',\n    '- FAQs: cleaning feels like mild pressure; children from age 3 with Dr. Lina; female dentists: Dr. Sara and Dr. Lina; same-day appointments often possible (check the calendar); whitening lasts 1-3 years; we offer clear aligners (metal braces: ask at a consultation); bring ID, insurance card and recent X-rays.'\n  ].join('\\n'));\n}\nif (has('knowledge') || has('aftercare')) {\n  notes.push(['CLINIC KNOWLEDGE (approved by the clinic; base your answer on it, in the patient’s language)', knowledge || '(nothing matched; call search_knowledge with short English keywords)', extra('knowledge')].filter(Boolean).join('\\n'));\n}\nif (has('requests') && extra('requests')) notes.push('REQUESTS AND PRIVACY\\n' + extra('requests'));\nif (has('nervous') && on.nervous_patient) notes.push('NERVOUS PATIENT: reassure warmly: our dentists are very gentle, explain every step and they can ask to pause any time. Never promise anything is painless. No booking yet: suggest a consultation first. Already booked: say you added a note so the dentist takes extra care. Never give medical advice.');\nif (has('late') && on.running_late) notes.push('RUNNING LATE: call running_late with minutes = minutes from now until they arrive, then reply following what it says.');\nif (has('photo')) notes.push(['PHOTO', extra('photo') || '- Describe the photo kindly, never diagnose, and suggest the right appointment.'].join('\\n'));\nif (arabic) notes.push('ARABIC TERMS: check-up = كشف / فحص, cleaning = تنظيف الأسنان, whitening = تبييض الأسنان, filling = حشوة, root canal = علاج عصب, extraction = خلع, implant = زراعة أسنان, clear aligners = تقويم شفاف, appointment = موعد, insurance = تأمين.');\n\nconst system = core + (notes.length ? '\\n\\nTOPIC NOTES FOR THIS MESSAGE\\n' + notes.join('\\n\\n') : '');\n\n// ---------- the message Noor answers ----------\nconst convo = hist.slice(-12).map(function (r) { return (r.role === 'patient' ? 'Patient: ' : 'Noor: ') + String(r.text).slice(0, 500); }).join('\\n');\nconst prompt = (convo ? 'RECENT CONVERSATION (oldest first):\\n' + convo + '\\n\\n' : '') + 'PATIENT’S NEW MESSAGE:\\n' + text;\n\n// ---------- model: Haiku by default; a stronger model for booking-type messages when smart_model is on ----------\nconst heavy = has('booking') || has('cancel') || has('emergency') || has('family');\nconst model = on.smart_model && heavy ? 'claude-sonnet-4-5-20250929' : 'claude-haiku-4-5-20251001';\n\nreturn [{ json: { system: system, prompt: prompt, model: model, intents: intents.join(','), kb_matched: kbMatched, flags: on, prompt_chars: system.length + prompt.length } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "1dd35707-b568-41ab-a139-af37fd66e0c1",
+      "name": "Clean Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        0
+      ],
+      "parameters": {
+        "jsCode": "let t = String($input.first().json.output || '').trim();\nt = t.replace(/\\*\\*(.+?)\\*\\*/g, '*$1*');            // WhatsApp bold uses single stars\nt = t.replace(/^#{1,6}\\s*/gm, '');                   // no markdown headings\nt = t.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^)]+)\\)/g, '$1: $2'); // plain links\nt = t.replace(/\\n{3,}/g, '\\n\\n');\n// Switch human_style: no long dashes, at most one emoji, tidy spaces.\nlet flags = {};\ntry { flags = $('Prepare').first().json.flags || {}; } catch (e) { flags = {}; }\nif (flags.human_style) {\n  t = t.replace(/\\s*—\\s*/g, ', ').replace(/\\s+–\\s+/g, ', ');\n  let n = 0;\n  t = t.replace(/\\p{Extended_Pictographic}️?/gu, function (m) { n++; return n > 1 ? '' : m; });\n  t = t.replace(/,\\s*,/g, ',').replace(/[ \\t]{2,}/g, ' ').replace(/ +([,.!?؟])/g, '$1').trim();\n}\nif (!t) t = 'Sorry, something went wrong on my side. A team member will reply to you shortly.';\nif (t.length > 3500) t = t.slice(0, 3500) + '…';\nreturn [{ json: { reply: t } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "3b5bb44f-797b-46f6-a88e-029d56b0a99d",
+      "name": "Booking Claim Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Booking guard (switch: booking_guard). Spots replies that say an appointment is confirmed or booked, so they can be checked against the Patients tab before sending.\nconst reply = String($input.first().json.reply || '');\nconst flags = $('Prepare').first().json.flags || {};\nconst CLAIM = /\\b(is|are|has been|have been|now|all)\\s+(confirmed|booked|set)\\b|\\b(appointment|booking|visit|check-?up)\\s+(is\\s+)?(confirmed|booked)\\b|you'?re\\s+(all\\s+)?(booked|set|confirmed)\\b|\\bsee you (then|on|there)\\b|تم\\s*(الحجز|حجز|تأكيد)|اتحجز|اتأكد|(موعدك|حجزك)\\s*(مؤكد|اتأكد|تأكد)/i;\nlet check = !!flags.booking_guard && CLAIM.test(reply);\n// Also catch statements like \"you have an appointment on Saturday at 10\" (not questions) that do not match the real booking.\nif (!!flags.booking_guard && !check) {\n  const HAVE = /\\byou(?:'ve|’ve| have)\\s+(?:got\\s+)?(?:an?\\s+)?(?:\\w+\\s+){0,3}(?:appointment|booking|visit|check-?up|cleaning)\\b|\\byour\\s+(?:appointment|booking|visit)\\s+(?:is|will be)\\s+(?:on|at|for)\\b|عندك\\s*(?:موعد|ميعاد|حجز)|(?:موعدك|ميعادك|حجزك)\\s+(?:يوم|بكر|الساعة)/i;\n  let before = {};\n  try { const p = $('Brain Input').first().json.patient; before = typeof p === 'string' ? JSON.parse(p || '{}') : (p || {}); } catch (e) { before = {}; }\n  const bm = String(before.appointment_start || '').match(/^\\d{4}-\\d{2}-(\\d{2})\\s+(\\d{1,2}):(\\d{2})/);\n  const exDay = bm ? parseInt(bm[1], 10) : -1;\n  const exTime = bm ? (parseInt(bm[2], 10) % 12) + ':' + bm[3] : '';\n  const MON = 'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر';\n  const sentences = reply.split(/(?<=[.!?؟\\n])/);\n  for (const s of sentences) {\n    if (!HAVE.test(s) || /[?؟]/.test(s)) continue;\n    const t = s.replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); });\n    const times = [];\n    const days = [];\n    let m;\n    const re1 = /(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm|a\\.m\\.|p\\.m\\.|ص|م(?![؀-ۿ])|مساء|صباح)/gi;\n    while ((m = re1.exec(t)) !== null) times.push((parseInt(m[1], 10) % 12) + ':' + (m[2] || '00'));\n    const re2 = /\\b([01]?\\d|2[0-3]):([0-5]\\d)\\b/g;\n    while ((m = re2.exec(t)) !== null) times.push((parseInt(m[1], 10) % 12) + ':' + m[2]);\n    const re3 = new RegExp('(\\\\d{1,2})\\\\s*(?:st|nd|rd|th)?\\\\s+(?:of\\\\s+)?(?:' + MON + ')', 'gi');\n    while ((m = re3.exec(t)) !== null) days.push(parseInt(m[1], 10));\n    const re4 = new RegExp('(?:' + MON + ')[a-z]*\\\\.?\\\\s+(\\\\d{1,2})\\\\b', 'gi');\n    while ((m = re4.exec(t)) !== null) days.push(parseInt(m[1], 10));\n    if (!times.length && !days.length) continue;\n    const same = times.every(function (x) { return x === exTime; }) && days.every(function (d) { return d === exDay; });\n    if (!same) { check = true; break; }\n  }\n}\nreturn [{ json: { reply: reply, check: check } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "7c67e8df-3478-4378-98ce-d16bec0a5b97",
+      "name": "Check Booking?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1780,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.check === true }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "48cab788-96d2-4c7d-9dc2-c3d8db638b3c",
+      "name": "Re-read Patient",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2000,
+        -140
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $('Brain Input').first().json.phone }}"
+            }
+          ]
+        },
+        "operation": "read",
+        "options": {
+          "returnFirstMatch": true
+        },
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "bf38d76b-1ae7-4d66-85e2-a2e1541a2c07",
+      "name": "Verify Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        -140
+      ],
+      "parameters": {
+        "jsCode": "// Booking guard: a reply that confirms a booking is only sent if the Patients tab shows that booking.\n// It passes when the booking changed in this message (new or moved), or when every date and time in the reply is the patient's existing booking.\nconst reply = String($('Booking Claim Check').first().json.reply || '');\nlet before = {};\ntry { const p = $('Brain Input').first().json.patient; before = typeof p === 'string' ? JSON.parse(p || '{}') : (p || {}); } catch (e) { before = {}; }\nconst after = $input.first().json || {};\nconst b = String(before.appointment_start || '');\nconst a = String(after.appointment_start || '');\nconst changed = a !== '' && (a !== b || String(after.calendar_event_id || '') !== String(before.calendar_event_id || ''));\nif (changed) return [{ json: { reply: reply, booking_check: 'ok: booking saved' } }];\n\nconst MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];\nconst AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];\nconst toArabicDigits = function (s) { return s.replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); }); };\nconst text = toArabicDigits(reply);\nconst mentionedTimes = [];\nconst timeRe = /(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm|a\\.m\\.|p\\.m\\.|ص|م\\b|مساء|مساءً|صباح|صباحا|صباحاً|العصر|بالليل)/gi;\nlet m;\nwhile ((m = timeRe.exec(text)) !== null) mentionedTimes.push((parseInt(m[1], 10) % 12) + ':' + (m[2] || '00'));\nconst time24 = /\\b([01]?\\d|2[0-3]):([0-5]\\d)\\b/g;\nwhile ((m = time24.exec(text)) !== null) mentionedTimes.push((parseInt(m[1], 10) % 12) + ':' + m[2]);\nconst mentionedDays = [];\nconst dayMonth = new RegExp('(\\\\d{1,2})\\\\s*(?:st|nd|rd|th)?\\\\s+(?:of\\\\s+)?(' + MONTHS.join('|') + '|' + AR_MONTHS.join('|') + ')', 'gi');\nwhile ((m = dayMonth.exec(text)) !== null) mentionedDays.push(parseInt(m[1], 10));\nconst monthDay = new RegExp('(' + MONTHS.join('|') + ')[a-z]*\\\\.?\\\\s+(\\\\d{1,2})\\\\b', 'gi');\nwhile ((m = monthDay.exec(text)) !== null) mentionedDays.push(parseInt(m[2], 10));\n\nlet existingTime = '';\nlet existingDay = 0;\nconst bm = b.match(/^\\d{4}-\\d{2}-(\\d{2})\\s+(\\d{1,2}):(\\d{2})/);\nif (bm) { existingDay = parseInt(bm[1], 10); existingTime = (parseInt(bm[2], 10) % 12) + ':' + bm[3]; }\nconst onlyExisting = existingTime !== '' && (mentionedTimes.length + mentionedDays.length) > 0 &&\n  mentionedTimes.every(function (t) { return t === existingTime; }) && mentionedDays.every(function (d) { return d === existingDay; });\nif (existingTime !== '' && mentionedTimes.length + mentionedDays.length === 0) return [{ json: { reply: reply, booking_check: 'ok: refers to existing booking' } }];\nif (onlyExisting) return [{ json: { reply: reply, booking_check: 'ok: existing booking' } }];\n\nconst arabic = /[؀-ۿ]/.test(reply);\nconst safe = arabic\n  ? 'عذراً، لم أتمكن من إتمام هذا الحجز في نظامنا، لذلك الموعد غير مؤكد بعد. أرسلت طلبك لفريقنا وسيتواصلون معك قريباً لتأكيد الموعد.'\n  : 'Sorry, I could not complete that booking in our system, so it is not confirmed yet. I have passed your request to our team and they will message you shortly to confirm the time.';\nreturn [{ json: { reply: safe, booking_check: 'blocked', blocked_reply: reply.slice(0, 600) } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "2111f975-a89f-4f7d-92cd-34fbf8965b89",
+      "name": "Finalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Final reply + side notes + history rows. Runs after the booking guard.\nconst input = $('Brain Input').first().json;\nconst prep = $('Prepare').first().json;\nconst flags = prep.flags || {};\nconst phone = String(input.phone || '');\nconst text = String(input.text || '');\nconst original = String($('Booking Claim Check').first().json.reply || '');\nconst verified = $('Verify Booking').isExecuted ? $('Verify Booking').first().json : null;\nconst reply = verified ? String(verified.reply) : original;\nconst blocked = !!verified && verified.booking_check === 'blocked';\nlet patient = {};\ntry { patient = typeof input.patient === 'string' ? JSON.parse(input.patient || '{}') : (input.patient || {}); } catch (e) { patient = {}; }\nlet tools = [];\ntry { tools = ($('Noor').first().json.intermediateSteps || []).map(function (s) { return s && s.action ? s.action.tool : ''; }).filter(Boolean); } catch (e) { tools = []; }\nconst time = DateTime.now().setZone('Asia/Dubai').toFormat('yyyy-MM-dd HH:mm');\n\nconst sideNotes = [];\n// Nervous patient note on the Patients tab.\nif (flags.nervous_patient && /(scared|nervous|afraid|anxious|anxiety|fear|phobia|panic|terrified|خايف|خايفة|بخاف|قلقان|قلقانة|مرعوب|خوف|رعب|متوتر|متوترة)/i.test(text) && !/nervous patient/i.test(String(patient.notes || ''))) {\n  sideNotes.push({ kind: 'nervous', phone: phone, notes: patient.notes ? patient.notes + '; nervous patient' : 'nervous patient' });\n}\n// Every cancel request, in the patient's own words.\nif (flags.save_cancellation && /(cancel|cancellation|الغاء|إلغاء|الغي|ألغي|الغى|ألغى|كنسل)/i.test(text)) {\n  sideNotes.push({ kind: 'cancel', time: time, phone: phone, service: String(patient.service || ''), reason: 'Request: ' + text.slice(0, 200), saved: 'asked' });\n}\n// Questions Noor had to hand to the team.\nif (flags.unanswered_log && text && /team member will (confirm|reply|get back|check|let you know)|our team will (confirm|check)|هيتواصل|سيتواصل|هيأكد|سيؤكد|هيرد عليك|يتواصل معك/i.test(original)) {\n  sideNotes.push({ kind: 'unanswered', time: time, phone: phone, question: text.slice(0, 300), status: 'new' });\n}\n// A confirmation that was not backed by the calendar.\nif (blocked) sideNotes.push({ kind: 'blocked', phone: phone, patient_text: text.slice(0, 300), noor_wanted: original.slice(0, 600) });\n\nreturn [{ json: { reply: reply, blocked: blocked, tools: tools.join(','), intents: prep.intents, model: prep.model, prompt_chars: prep.prompt_chars, side_notes: sideNotes, test_mode: String(input.test_mode || '') === 'yes' } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "66002757-d330-4db8-8602-3871036c7759",
+      "name": "Side Notes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        -200
+      ],
+      "parameters": {
+        "jsCode": "// One item per side note (skipped in test mode, so tests write nothing to the Sheet).\nconst f = $('Finalize').first().json;\nif (f.test_mode) return [];\nreturn (f.side_notes || []).map(function (n) { return { json: n }; });\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "9407e996-1778-4d3a-a0a3-b7f0b3e84e68",
+      "name": "Note Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2880,
+        -200
+      ],
+      "parameters": {
+        "looseTypeValidation": true,
+        "options": {},
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.kind }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "nervous"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "nervous",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.kind }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "cancel"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "cancel",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.kind }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "unanswered"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "unanswered",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.kind }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "blocked"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "blocked",
+              "renameOutput": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f1a745c6-41cb-49b3-902c-6d4be3ac77eb",
+      "name": "Save Nervous Note",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3100,
+        -420
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "phone"
+          ],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "notes",
+              "id": "notes",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "notes": "={{ $json.notes }}",
+            "phone": "={{ $json.phone }}"
+          }
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "appendOrUpdate",
+        "options": {
+          "cellFormat": "RAW"
+        },
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "c2423f82-bcc7-4689-b148-18204b24b4a7",
+      "name": "Log Cancel Request",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3100,
+        -280
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "schema": [],
+          "value": {}
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "append",
+        "options": {
+          "handlingExtraData": "ignoreIt"
+        },
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "15596833-f542-431a-ad14-53ca09d986eb",
+      "name": "Log Unanswered",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3100,
+        -140
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "schema": [],
+          "value": {}
+        },
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "append",
+        "options": {
+          "handlingExtraData": "ignoreIt"
+        },
+        "resource": "sheet",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "7164cbd7-7c17-4bb8-8876-aefdb84545ba",
+      "name": "Alert Staff: Booking",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3100,
+        0
+      ],
+      "parameters": {
+        "messageType": "text",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "={{ (() => { try { const on = $('Prepare').first().json.flags.clinic_setup; const r = $('Get Setup').all().map(i => i.json).find(x => x.tab === 'clinic' && x.name === 'owner_phone'); const p = r ? String(r.value).replace(/\\D/g, '') : ''; return on && p.length >= 8 ? p : '000000000000'; } catch (e) { return '000000000000'; } })() }}",
+        "resource": "message",
+        "textBody": "=[Noor] Booking NOT saved for +{{ $json.phone }}, so Noor did not send its confirmation. The patient was told the team will confirm.\nPatient wrote: {{ $json.patient_text }}\nNoor wanted to say: {{ $json.noor_wanted }}"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "ac5be65a-84ce-44f4-9606-941d5eb19f52",
+      "name": "History Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Two history rows: the patient's message and the reply actually sent (the corrected one if a reply was blocked).\nconst input = $('Brain Input').first().json;\nconst f = $('Finalize').first().json;\nreturn [\n  { json: { phone: String(input.phone || ''), role: 'patient', text: String(input.text || '').slice(0, 1500), intents: '' } },\n  { json: { phone: String(input.phone || ''), role: 'noor', text: String(f.reply || '').slice(0, 1500), intents: String(f.intents || '') } }\n];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "0701e8fa-33ff-4ff1-bfe5-5d270ac47b4a",
+      "name": "Save History",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2880,
+        200
+      ],
+      "parameters": {
+        "columns": {
+          "mappingMode": "defineBelow",
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "phone",
+              "id": "phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "role",
+              "id": "role",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "text",
+              "id": "text",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "intents",
+              "id": "intents",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "intents": "={{ $json.intents }}",
+            "phone": "={{ $json.phone }}",
+            "role": "={{ $json.role }}",
+            "text": "={{ $json.text }}"
+          }
+        },
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "insert",
+        "options": {},
+        "resource": "row"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "dc3ba6ec-a34d-459a-a6fb-4f31a2064993",
+      "name": "Return Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3100,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// What Noor – Main receives.\nconst f = $('Finalize').first().json;\nreturn [{ json: { reply: f.reply, blocked: f.blocked, tools: f.tools, intents: f.intents, model: f.model, prompt_chars: f.prompt_chars, side_notes: (f.side_notes || []).map(function (n) { return n.kind; }).join(',') } }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "7b075aaa-7bcd-4e9c-b54f-70ea2706d249",
+      "name": "Check Family Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "getAll",
+        "options": {
+          "query": "={{ String($('Brain Input').first().json.phone || '').replace(/\\D/g, '') }}"
+        },
+        "resource": "event",
+        "returnAll": true,
+        "timeMin": "={{ $now.minus({ days: 1 }).toISO() }}"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "1f0e22d3-1277-40d7-be7a-d8e0f2e7a743",
+      "name": "Family Pass",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2320,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Family bookings are saved in the calendar only. If a fresh family event exists for this phone, show the booking guard that a booking was saved.\n// Test mode: bookings are dry runs (nothing is written), so pass only when the booking tool itself said Booked or Moved.\nconst row = $('Re-read Patient').first().json || {};\nlet tm = false;\ntry { tm = String($('Brain Input').first().json.test_mode || '') === 'yes'; } catch (e) { tm = false; }\n// Website demo chat and Test Suite phones (9715000009...) are dry runs in the Booking Engine too: treat them as test mode.\ntry { if (/^000000000000/.test(String($('Brain Input').first().json.phone || '').replace(/\\D/g, ''))) tm = true; } catch (e) { /* keep */ }\nif (tm) {\n  let said = false;\n  try { said = ($('Noor').first().json.intermediateSteps || []).some(function (st) { return /^(Booked|Moved to)/.test(String((st && st.observation) || '').replace(/^[\\s\\[\\{\"']*(response\"?\\s*:\\s*\"?)?/i, '')) || /\"response\"\\s*:\\s*\"(Booked|Moved to)/.test(JSON.stringify(st && st.observation || '')); }); } catch (e) { said = false; }\n  if (said) return [{ json: Object.assign({}, row, { calendar_event_id: 'test-dry-run', appointment_start: row.appointment_start || 'test' }) }];\n}\nlet ph = '';\ntry { ph = String($('Brain Input').first().json.phone || '').replace(/\\D/g, ''); } catch (e) { ph = ''; }\nconst evs = $('Check Family Event').all().map(function (i) { return i.json; });\nconst fam = evs.find(function (e) {\n  const d = String((e && e.description) || '');\n  return e && e.id && ph !== '' && /family member/i.test(d) && d.indexOf(ph) >= 0 && (Date.now() - new Date(e.created).getTime()) < 5 * 60 * 1000;\n});\nif (!fam) return [{ json: row }];\nreturn [{ json: Object.assign({}, row, { calendar_event_id: String(fam.id), appointment_start: row.appointment_start || 'family' }) }];",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "26137f90-113d-48f7-a313-22342d6e925f",
+      "name": "Prompt Patch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -140
+      ],
+      "parameters": {
+        "jsCode": "// Prompt patches, each behind its own switch.\n// clinic_setup: clinic details, hours, dentists and prices come from the Clinic Setup / Prices / Dentists tabs.\n// family_bookings: books a family member in the calendar instead of logging a request.\n// human_style: extra rules so replies sound like a real receptionist texting.\nconst out = Object.assign({}, $('Prepare').first().json);\nconst flags = out.flags || {};\n\nfunction setupRows() { try { return $('Get Setup').all().map(function (i) { return i.json || {}; }).filter(function (r) { return r.tab; }); } catch (e) { return []; } }\nfunction money(n) { return Number(n).toLocaleString('en-US'); }\n\nif (typeof out.system === 'string' && flags.clinic_setup) {\n  const rows = setupRows().sort(function (a, b) { return Number(a.sort || 0) - Number(b.sort || 0); });\n  const c = {};\n  rows.filter(function (r) { return r.tab === 'clinic'; }).forEach(function (r) { c[r.name] = String(r.value || '').trim(); });\n  const prices = rows.filter(function (r) { return r.tab === 'price' && r.value !== '' && !isNaN(Number(r.value)); });\n  const dentists = rows.filter(function (r) { return r.tab === 'dentist'; });\n  if (c.clinic_name) {\n    let s = out.system;\n    const clinic = c.clinic_name;\n    const assistant = c.assistant_name || 'Noor';\n    const cur = c.currency || 'AED';\n    const slot = Number(c.slot_minutes) || 30;\n    const DAYS = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'];\n    const cap = function (d) { return d.charAt(0).toUpperCase() + d.slice(1); };\n    const hoursOf = function (d) { const v = String(c['hours_' + d] || '').trim(); return /^\\d{1,2}:\\d{2}\\s*-\\s*\\d{1,2}:\\d{2}$/.test(v) ? v.replace(/\\s/g, '') : 'closed'; };\n    // Opening hours summary, grouping days with the same hours: \"Saturday-Thursday 09:00-21:00, Friday 14:00-21:00\"\n    const groups = [];\n    DAYS.forEach(function (d) { const h = hoursOf(d); const g = groups[groups.length - 1]; if (g && g.h === h) g.to = d; else groups.push({ from: d, to: d, h: h }); });\n    const hoursText = groups.map(function (g) { return cap(g.from) + (g.to !== g.from ? '-' + cap(g.to) : '') + ' ' + g.h; }).join(', ');\n    const closed = String(c.closed_dates || '').split(/[,;\\s]+/).filter(function (x) { return /^\\d{4}-\\d{2}-\\d{2}$/.test(x); });\n\n    s = s.replace(/You are Noor, the WhatsApp assistant for BrightSmile Dental in Dubai \\(a fictional demo clinic\\)\\./, function () { return 'You are ' + assistant + ', the WhatsApp assistant for ' + clinic + ' (' + (c.address || '') + ').'; });\n    s = s.split('BrightSmile’s virtual assistant').join(clinic + '’s virtual assistant');\n\n    const dentLine = dentists.length\n      ? 'Dentists: ' + dentists.map(function (d) { return d.name + ' (' + [d.value, d.option].filter(Boolean).join('; ') + ')'; }).join(', ') + '.' + (c.languages ? ' ' + c.languages : '')\n      : '';\n    const basics = [\n      clinic + ', ' + (c.address || '') + '.' + (c.parking ? ' ' + c.parking + '.' : '') + ' Open ' + hoursText + '; ' + slot + '-minute slots, last appointment ' + slot + ' minutes before closing.' + (closed.length ? ' Closed on: ' + closed.join(', ') + '.' : ''),\n      dentLine,\n      [c.payment, c.insurance].filter(Boolean).join(' ')\n    ].filter(Boolean).join('\\n');\n    s = s.replace(/CLINIC BASICS\\n[\\s\\S]*?\\n\\n/, function () { return 'CLINIC BASICS\\n' + basics + '\\n\\n'; });\n\n    if (prices.length) {\n      const list = prices.map(function (p) {\n        const from = /^y/i.test(String(p.option || ''));\n        return p.name + ' ' + (from ? 'from ' : '') + money(p.value) + (p.notes ? ' (' + p.notes + ')' : '') + (Number(p.minutes) && Number(p.minutes) !== slot ? ' (about ' + p.minutes + ' min)' : '');\n      }).join(' | ') + '.';\n      s = s.replace(/PRICES \\(AED\\)\\n[^\\n]*/, function () { return 'PRICES (' + cur + ')\\n' + list; });\n    }\n\n    s = s.replace('(Friday opens 14:00, last appointment 20:30)', '(see the opening hours for each day in the calendar below)');\n    s = s.replace(/^(- \\S+ \\d{1,2} \\S+ \\d{4} = (\\d{4}-\\d{2}-\\d{2}) = [^|\\n]*\\| )(open [^\\n]*|CLOSED)$/gm, function (m, head, ymd) {\n      const d = DateTime.fromISO(ymd, { zone: 'Asia/Dubai' });\n      const h = hoursOf(DAYS[(d.weekday + 1) % 7]);\n      return head + (closed.indexOf(ymd) >= 0 || h === 'closed' ? 'CLOSED' : 'open ' + h);\n    });\n\n    const minTotal = Number(c.instalments_min_total) || 2000;\n    const months = Number(c.instalments_months) || 6;\n    const examples = prices.filter(function (p) { return Number(p.value) > minTotal; }).slice(0, 2)\n      .map(function (p) { return p.name.toLowerCase() + ' from ' + cur + ' ' + money(Math.ceil(Number(p.value) / months)) + '/month'; }).join(', ');\n    s = s.replace(/MORE than AED 2,000, add one line about 0% instalments over 6 months with the monthly amount \\([^)]*\\)/, function () {\n      return 'MORE than ' + cur + ' ' + money(minTotal) + ', add one line about 0% instalments over ' + months + ' months with the monthly amount' + (examples ? ' (' + examples + ')' : '');\n    });\n    if (c.emergency_number) s = s.replace('call 998', 'call ' + c.emergency_number);\n    s = s.replace('- Location: Jumeirah, Dubai (demo address), free parking.', '- Location: ' + (c.address || '') + (c.parking ? ', ' + c.parking.toLowerCase() : '') + '.');\n    out.system = s;\n  }\n}\n\nif (typeof out.system === 'string' && flags.family_bookings) {\n  const OLD = /FAMILY BOOKING: if the patient record shows an upcoming booking[^\\n]*/;\n  const NEW = 'FAMILY BOOKING: collect the family member’s full name, age (for a child), service and preferred time. For a child use service \"children’s check-up\" in find_free_slots. Then call book_appointment with the FAMILY MEMBER’s own name, even if this chat already has a booking for someone else (the system keeps it as a separate booking in the calendar). Say it is booked only if the tool says Booked. Never call reschedule_appointment or cancel_appointment for a family member: use log_request with type \"family booking\" instead. If book_appointment refuses, use log_request and give the request number.';\n  out.system = out.system.replace(OLD, function () { return NEW; });\n}\n\nif (typeof out.system === 'string' && flags.human_style) {\n  const HUMAN = [\n    'HUMAN STYLE (most important for how you write)',\n    '- Write like a real receptionist texting on WhatsApp: short natural sentences, everyday words, contractions (I’ll, you’re, we’ve). Usually 1 to 3 short sentences, then at most ONE question.',\n    '- First react to what they said in a few words (e.g. \"Sure!\", \"Of course\", \"Oh no, sorry to hear that\", \"تمام\", \"أكيد\", \"ولا يهمك\"), then answer. Vary your openers: do not start with \"Perfect!\" or \"Great!\", and never reuse the opener of your previous message.',\n    '- Do not repeat things they already know (like their existing booking) unless they asked or it matters for this answer.',\n    '- Never use the long dash (—) or semicolons. Do not use bullet lists for 3 or fewer items: write them in one sentence, e.g. \"I have 10, 11 or 2 on Saturday, which suits you?\"',\n    '- Avoid robotic phrases: \"I have logged\", \"please be advised\", \"kindly\", \"do not hesitate\", \"feel free\", \"I understand your concern\", \"يسعدني إبلاغك\", \"نود إعلامك\". For requests say simply: \"I’ve passed this to the team (ref R123), they’ll message you soon.\"',\n    '- Arabic: text the way people do in their dialect, not formal Arabic. Egyptian example: \"تمام، عندنا السبت الصبح 10 أو 11، يناسبك أنهي ميعاد؟\" Gulf example: \"أكيد، عندنا السبت الصبح 10 أو 11، أي وقت يناسبك؟\". Follow the speaker’s own gender words (عايز/عايزة, أبي/أبغى); if unclear, use neutral forms.',\n    '- Use their first name at most once in a conversation, and only if they told you their name in this chat.',\n    '- Times: suggest only times that find_free_slots returned in THIS turn; if you have not called it yet in this turn, call it first. Never describe a booking as existing unless the patient record or my_booking shows it.'\n  ].join('\\n');\n  if (out.system.indexOf('\\n\\nRULES\\n') >= 0) out.system = out.system.replace('\\n\\nRULES\\n', function () { return '\\n' + HUMAN + '\\n\\nRULES\\n'; });\n  else out.system = out.system + '\\n\\n' + HUMAN;\n}\nreturn [{ json: out }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "9ff69e55-e635-4966-83a9-26e6af982c68",
+      "name": "Get Setup",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        -300
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "REPLACE_ME",
+          "mode": "id",
+          "value": "REPLACE_ME"
+        },
+        "operation": "get",
+        "resource": "row",
+        "returnAll": true
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "5451bdf6-5c33-4719-819a-96c0c76ee962",
+      "name": "Trim History",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        -300
+      ],
+      "parameters": {
+        "jsCode": "// Switch human_style: keep only the last 8 messages of the chat so Noor does not copy old mistakes from long histories.\n// Switch satisfaction_check: tells Noor how to answer a 1-5 visit rating (asked by the visit_feedback template).\nconst out = Object.assign({}, $input.first().json);\nconst flags = out.flags || {};\nif (flags.human_style && typeof out.prompt === 'string') {\n  const head = 'RECENT CONVERSATION (oldest first):\\n';\n  const i = out.prompt.indexOf(head);\n  const j = out.prompt.indexOf('\\n\\nPATIENT’S NEW MESSAGE:');\n  if (i === 0 && j > i) {\n    const parts = out.prompt.slice(head.length, j).split(/\\n(?=(?:Patient|Noor): )/);\n    if (parts.length > 8) out.prompt = head + parts.slice(-8).join('\\n') + out.prompt.slice(j);\n  }\n}\nif (flags.satisfaction_check && typeof out.system === 'string') {\n  let link = '';\n  try { const r = $('Get Setup').all().map(function (x) { return x.json || {}; }).find(function (x) { return x.tab === 'clinic' && x.name === 'google_review_link'; }); link = r ? String(r.value || '').trim() : ''; } catch (e) { link = ''; }\n  out.system += '\\n\\nVISIT RATING: after a visit the clinic asks the patient to rate it from 1 to 5. If the patient\\'s new message is only a rating (a number from 1 to 5, or words like \"5 stars\", \"excellent\", \"ممتاز\"): for 4 or 5 thank them warmly' + (link ? ' and invite them to leave a short Google review here: ' + link : '') + '. For 1, 2 or 3 apologise sincerely, ask what went wrong, and call alert_staff with the rating and their words. Do not ask for a rating yourself.';\n}\n// Audit 17 Nov 2026: extra quality rules (language, dialect, greetings, complaints, emergencies, discounts).\nif (typeof out.system === 'string') {\n  out.system += '\\n\\nQUALITY RULES (always follow):\\n' +\n    '1. LANGUAGE: reply in the language of the patient\\'s newest message, ignoring any [bracketed note] and older messages. Arabic message = Arabic reply. Arabic written in Latin letters (Arabizi, e.g. \"kam se3r\") = Arabic reply.\\n' +\n    '2. DIALECT: mirror the patient\\'s dialect. If unclear, use simple Gulf-friendly Arabic. Never mix Egyptian words (بتاع، دلوقتي، عايز، ده) into a Gulf or standard Arabic reply, and never mix Gulf words into an Egyptian reply.\\n' +\n    '3. GREETINGS: only say good morning / good evening (صباح الخير / مساء الخير) if it matches the Dubai time given above. If unsure, just say hello (أهلاً).\\n' +\n    '4. COMPLAINTS AND ANGRY PATIENTS: apologise sincerely and specifically for what they described, do not defend the clinic or ask them to repeat themselves. Call alert_staff with a one-line summary, then tell them a team member will contact them today. Never say the team will contact them unless you called alert_staff or log_request in this turn.\\n' +\n    '5. EMERGENCIES: heavy bleeding that does not stop, facial swelling with fever, trouble breathing or swallowing, or a serious injury: tell them to call 998 (UAE ambulance) or go to the nearest emergency department now, in one or two short lines, then call alert_staff. Do not offer a normal appointment first.\\n' +\n    '6. DISCOUNTS: never invent a discount or offer. Say the team will check current offers for them and call log_request.\\n' +\n    '7. Stay inside your role: politely decline unrelated tasks (poems, homework, coding) in one line and offer help with the clinic.';\n}\nreturn [{ json: out }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "4cc0e86e-545c-446c-80c0-8f6b1e129df6",
+      "name": "Clinic Type Patch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        -220
+      ],
+      "parameters": {
+        "jsCode": "// Clinic type (Clinic Setup row \"clinic_type\"): makes Noor fit any clinic, not only dental.\n// Values: dental (default, nothing changes), dermatology, aesthetics, cosmetic_surgery, hair, physiotherapy, ivf, general, vet, or any other word.\n// Website demo: messages marked [DEMO:glow] answer as the fictional Glow Skin Clinic (information only, no real bookings).\nconst out = Object.assign({}, $input.first().json);\nlet type = '';\ntry { $('Get Setup').all().forEach(function (i) { const r = i.json || {}; if (r.tab === 'clinic' && r.name === 'clinic_type') type = String(r.value || '').trim().toLowerCase(); }); } catch (e) {}\nconst demo = typeof out.prompt === 'string' && out.prompt.indexOf('[DEMO:glow]') >= 0;\nif (demo) { out.prompt = out.prompt.split('[DEMO:glow]').join(''); type = 'aesthetics'; }\nif (!type || /^dent/.test(type)) return [{ json: out }];\nconst T = {\n  dermatology: ['dermatology', 'doctor', 'doctors'], aesthetics: ['aesthetics', 'doctor', 'doctors'], cosmetic_surgery: ['cosmetic surgery', 'surgeon', 'surgeons'],\n  hair: ['hair restoration', 'doctor', 'doctors'], physiotherapy: ['physiotherapy', 'physiotherapist', 'physiotherapists'], physio: ['physiotherapy', 'physiotherapist', 'physiotherapists'],\n  ivf: ['fertility', 'doctor', 'doctors'], fertility: ['fertility', 'doctor', 'doctors'], general: ['medical', 'doctor', 'doctors'], medical: ['medical', 'doctor', 'doctors'],\n  vet: ['veterinary', 'vet', 'vets'], veterinary: ['veterinary', 'vet', 'vets']\n};\nconst t = T[type] || [type.replace(/_/g, ' '), 'doctor', 'doctors'];\nconst cap = function (s) { return s.charAt(0).toUpperCase() + s.slice(1); };\nconst fix = function (s) {\n  let x = String(s).split('\\n').filter(function (l) { return !/knocked-out tooth|ARABIC TERMS:|FAQs: cleaning feels|wisdom teeth/i.test(l); });\n  if (demo) x = x.filter(function (l) { return !/Dr\\. (Sara|Omar|Lina)|whitening|scale and polish|root canal|implant|aligner|filling|extraction|Free parking|Jumeirah, Dubai \\(demo address\\)/i.test(l); });\n  x = x.join('\\n');\n  if (demo) x = x.replace(/BrightSmile Dental/g, 'Glow Skin Clinic');\n  return x.replace(/\\bDentists\\b/g, cap(t[2])).replace(/\\bdentists\\b/g, t[2])\n    .replace(/\\bDentist\\b/g, cap(t[1])).replace(/\\bdentist\\b/g, t[1])\n    .replace(/dental meaning/g, t[0] + ' meaning').replace(/\\bdental\\b/gi, t[0]);\n};\nif (typeof out.system === 'string') {\n  out.system = fix(out.system) + '\\n\\nCLINIC TYPE: this is ' + (/^[aeiou]/i.test(t[0]) ? 'an ' : 'a ') + t[0] + ' clinic. Only offer the services, prices and ' + t[2] + ' listed in this prompt. Never talk about teeth or dental treatments unless the patient asks; if they ask for something the clinic does not offer, say so politely. If the patient describes a medical emergency (trouble breathing, heavy bleeding, chest pain, fainting), tell them to call the local emergency number or go to the nearest emergency room right away.';\n  if (demo) out.system += '\\n\\nWEBSITE DEMO (most important, overrides everything above about the clinic): you are Noor for GLOW SKIN CLINIC, a fictional dermatology and aesthetics clinic used to show clinic owners how Noor works. Never mention BrightSmile or dentistry.\\n' +\n    '- Address: Al Wasl Road, Jumeirah, Dubai (demo). Valet parking. Open Saturday-Thursday 10:00-21:00, Friday 14:00-21:00.\\n' +\n    '- Team: Dr. Layla Mansour (consultant dermatologist; acne, pigmentation, skin checks; female), Dr. Karim Saleh (aesthetic physician; Botox, fillers, skin boosters), Nurse Aya (laser and facials; female).\\n' +\n    '- Prices in AED: doctor consultation 300 (deducted if you do a treatment the same day) | HydraFacial 650 | Chemical peel from 500 | Microneedling 900 | Skin booster from 1,500 | Botox from 1,200 per area | Dermal filler from 1,800 per ml | Laser hair removal: underarms 250, full legs 900, full body 2,200 | Acne treatment plan from 450 per session | PRP for hair 1,200 per session. Packages of 6 laser sessions get 15% off. Final prices are confirmed at the consultation.\\n' +\n    '- Policies: patch test before the first laser session; Botox and fillers need a doctor consultation first; tell the clinic if pregnant or on medication; cancellations free up to 24 hours before.\\n' +\n    '- Payments: card, cash, Tabby (4 payments). Insurance does not cover cosmetic treatments.\\n' +\n    '- Booking in this demo: do NOT call any tools. When they want to book, offer 2 or 3 plausible times (for example tomorrow 11:00, 14:30 or 18:00) with the right team member. When they choose, say: \"Great choice! In a real clinic Noor would now reserve this in your calendar and send reminders. This is only a demo, so nothing is reserved.\" Never say booked or confirmed.\\n' +\n    '- Never give medical advice or diagnose; suggest a consultation for skin concerns.';\n}\nif (typeof out.prompt === 'string') out.prompt = out.prompt.replace(/dental meaning/g, t[0] + ' meaning');\nreturn [{ json: out }];\n",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "37b83ef9-7fb5-4e6c-b5f6-7bd85fe96947",
+      "name": "Booking Flow Rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2300,
+        700
+      ],
+      "parameters": {
+        "jsCode": "// Audit 17 Nov 2026: booking must finish quickly; no tool narration; correct greeting for the Dubai time of day.\nconst out = Object.assign({}, $input.first().json);\nif (typeof out.system === 'string') {\n  const h = DateTime.now().setZone('Asia/Dubai').hour;\n  const part = h >= 5 && h < 12 ? 'MORNING: if you greet, say \"Good morning\" / \"صباح الخير\". Never say good afternoon or good evening now.' : (h >= 12 && h < 17 ? 'AFTERNOON: if you greet, say \"Good afternoon\" or just \"Hello\" / \"أهلاً\". Never say good morning or good evening now.' : (h >= 17 ? 'EVENING: if you greet, say \"Good evening\" / \"مساء الخير\". Never say good morning now.' : 'NIGHT: greet with just \"Hello\" / \"أهلاً\", never good morning or good evening.'));\n  out.system += '\\n8. BOOKING SPEED: to book you only need the service, the time and the patient\\'s full name. Ask about insurance at most once, and only if useful; if the patient does not answer it clearly, book with insurance \"unknown\". When the patient says yes, ok, confirm, تمام, اكد or similar after you offered a time, call book_appointment immediately and confirm the booking. Never ask the same question twice.\\n' +\n    '9. Never describe your own actions or tools (no \"I\\'ll check...\", \"let me look up...\"). Just give the answer.\\n' +\n    '10. TIME OF DAY RIGHT NOW IN DUBAI IS ' + part;\n}\nreturn [{ json: out }];\n"
+      }
+    },
+    {
+      "id": "102689c7-be28-4c17-92ee-0ca7cdbad72b",
+      "name": "Arabic Claim Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        140
+      ],
+      "parameters": {
+        "jsCode": "// Audit 17 Nov 2026: also catch Gulf/standard Arabic booking claims (e.g. \"موعدك محجوز\", \"حجزت لك\") so they are verified against the Patients tab like English ones.\nconst it = Object.assign({}, $input.first().json);\nconst flags = $('Prepare').first().json.flags || {};\nconst AR = /(موعدك|حجزك|ميعادك)\\s*(محجوز|ثابت|جاهز|تم|مؤكد)|حجزت\\s*(لك|لكي|لـ)|حجزتلك|تم\\s*تأكيد|أكدت\\s*(لك|موعدك)|شوفك\\s*(يوم|بكر|الخميس|السبت|الأحد|الاثنين|الثلاثاء|الأربعاء|الجمعة)|محجوز\\s*(يوم|الساعة)/;\nif (flags.booking_guard && !it.check && AR.test(String(it.reply || ''))) it.check = true;\nreturn [{ json: it }];\n"
+      }
+    },
+    {
+      "id": "58ffedca-3827-4014-85a8-fc9a4821a4f3",
+      "name": "Style Rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        600
+      ],
+      "parameters": {
+        "jsCode": "// Adds Noor's tone and formatting rules (11-21) to the same instructions the earlier rule nodes extend. Switch: set STYLE_ON to false to turn off.\nconst STYLE_ON = true;\nconst it = Object.assign({}, $json);\nif (!STYLE_ON) return { json: it };\nconst RULES = '\\n\\nSTYLE RULES (follow strictly, they override earlier style notes):\\n' +\n  '11. Tone: calm, polished and human, like an experienced receptionist at a premium clinic. Short natural sentences. Never robotic, never over-excited.\\n' +\n  '12. Emoji: usually none. At most one, only on a booking confirmation or a friendly goodbye. Never for pain, complaints, emergencies or bad news.\\n' +\n  '13. Empathy only when it fits: if the patient mentions pain, worry or a problem, acknowledge it in a few words first (\"Sorry you are in pain\" / \"سلامتك\"). Otherwise do not say \"I understand\".\\n' +\n  '14. When offering appointments, give 2 or 3 exact times from find_free_slots (day and time). Keep replies under about 50 words.\\n' +\n  '15. NO FILLER: start with the answer itself. Never write openers or padding such as \"I\\'d be happy to help\", \"I understand!\", \"Perfect!\", \"Great!\", \"Great news!\", \"Absolutely!\", \"Just to confirm\", \"I want to make sure\", \"Thanks for your message\", \"you\\'re all set\". A short \"Sure,\" or \"Of course,\" is fine at most once per conversation.\\n' +\n  '16. Never announce what you are going to do (\"Let me find you some times\", \"Let me check\"). If you need free times, call find_free_slots in this turn and give the times. If you still need a detail from them (day, time or full name), ask for just that in one short question.\\n' +\n  '17. When the patient clearly asks to book a specific service, do not ask discovery questions (what they want to change, special dates). Go straight to finding a day and time.\\n' +\n  '18. If the patient gives their name and it differs from the patient record or WhatsApp profile, simply use the name they gave (families share phones). Do not question it, do not ask them to confirm it and do not call alert_staff for it. Book straight away when you have service, time and name.\\n' +\n  '19. Never ask patients to bring ID or any documents, and never ask for ID numbers.\\n' +\n  '20. Do not repeat details the patient already knows (their booking, the location, the price) unless they ask or something changed. After a booking is confirmed, a short goodbye is enough.\\n' +\n  '21. End with a question only when you need something from the patient. Otherwise just answer.';\nlet done = false;\nObject.keys(it).forEach(function (k) {\n  if (!done && typeof it[k] === 'string' && /QUALITY RULES|RULES/.test(it[k]) && it[k].length > 200) { it[k] = it[k] + RULES; done = true; }\n});\nif (!done && typeof it.systemPrompt === 'string') it.systemPrompt += RULES;\nreturn { json: it };",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "3952517b-5486-44ff-b915-7292d112d877",
+      "name": "Trim Filler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        160
+      ],
+      "parameters": {
+        "jsCode": "// Removes stock openers like \"Great!\", \"Perfect!\", \"I'd be happy to help!\" from the start of Noor's reply, so it sounds like a real person. Switch: set TRIM_ON to false to turn off.\nconst TRIM_ON = true;\nconst it = Object.assign({}, $input.first().json);\nif (!TRIM_ON) return [{ json: it }];\nlet r = String(it.reply || '');\nconst OPENER = /^\\s*(great news|great|perfect|absolutely|awesome|wonderful|excellent|amazing|fantastic|sure thing|no problem at all|i'?d be (happy|glad) to help( you)?( with that)?|i understand|i completely understand|thanks for (your message|reaching out|asking))\\s*[!.,:—-]*\\s*/i;\nfor (let i = 0; i < 2; i++) { const m = r.match(OPENER); if (m && r.length - m[0].length > 15) r = r.slice(m[0].length); }\nr = r.replace(/^\\s+/, '');\nif (r) r = r.charAt(0).toUpperCase() + r.slice(1);\nit.reply = r || String(it.reply || '');\nreturn [{ json: it }];",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    }
+  ],
+  "connections": {
+    "Claude Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "find_free_slots": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "book_appointment": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reschedule_appointment": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancel_appointment": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "my_booking": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_patient": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "estimate_price": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_location": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log_cancellation": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "running_late": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "search_knowledge": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log_request": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "approval_status": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "alert_staff": {
+      "ai_tool": [
+        [
+          {
+            "node": "Noor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brain Input": {
+      "main": [
+        [
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Settings": {
+      "main": [
+        [
+          {
+            "node": "Get Knowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Knowledge": {
+      "main": [
+        [
+          {
+            "node": "Get History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get History": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Noor": {
+      "main": [
+        [
+          {
+            "node": "Clean Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Noor Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Booking?": {
+      "main": [
+        [
+          {
+            "node": "Re-read Patient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Booking": {
+      "main": [
+        [
+          {
+            "node": "Finalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize": {
+      "main": [
+        [
+          {
+            "node": "Side Notes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "History Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Side Notes": {
+      "main": [
+        [
+          {
+            "node": "Note Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Note Type": {
+      "main": [
+        [
+          {
+            "node": "Save Nervous Note",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Cancel Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Unanswered",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Staff: Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "History Rows": {
+      "main": [
+        [
+          {
+            "node": "Save History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save History": {
+      "main": [
+        [
+          {
+            "node": "Return Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-read Patient": {
+      "main": [
+        [
+          {
+            "node": "Check Family Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Family Event": {
+      "main": [
+        [
+          {
+            "node": "Family Pass",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Family Pass": {
+      "main": [
+        [
+          {
+            "node": "Verify Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare": {
+      "main": [
+        [
+          {
+            "node": "Get Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Setup": {
+      "main": [
+        [
+          {
+            "node": "Prompt Patch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Patch": {
+      "main": [
+        [
+          {
+            "node": "Clinic Type Patch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clinic Type Patch": {
+      "main": [
+        [
+          {
+            "node": "Trim History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trim History": {
+      "main": [
+        [
+          {
+            "node": "Booking Flow Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Claim Check": {
+      "main": [
+        [
+          {
+            "node": "Arabic Claim Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arabic Claim Check": {
+      "main": [
+        [
+          {
+            "node": "Check Booking?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Flow Rules": {
+      "main": [
+        [
+          {
+            "node": "Style Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Style Rules": {
+      "main": [
+        [
+          {
+            "node": "Noor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Reply": {
+      "main": [
+        [
+          {
+            "node": "Trim Filler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trim Filler": {
+      "main": [
+        [
+          {
+            "node": "Booking Claim Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,413 @@
+{
+  "name": "Halora – Pilot Intake",
+  "nodes": [
+    {
+      "id": "92b611c0-1a51-49c9-b59a-b6e8a221a0ca",
+      "name": "Pilot Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "4d3cd870-0d07-4ba0-9b8e-48c886eda756",
+      "name": "Build Setup Pack",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "jsCode": "// Turns the clinic's form answers into rows for the clinic Sheet tabs.\nconst b = ($input.first().json.body) || {};\nconst s = v => String(v == null ? '' : v).replace(/[\\t\\r]/g, ' ').replace(/\\n+/g, ' / ').trim().slice(0, 1500);\nconst arr = v => Array.isArray(v) ? v.slice(0, 80) : [];\nif (b.website_hp) return [{ json: { spam: true } }];\nconst days = ['saturday','sunday','monday','tuesday','wednesday','thursday','friday'];\nconst hours = b.hours || {};\nconst setup = [\n  ['clinic_name', s(b.clinic_name)], ['assistant_name', s(b.assistant_name) || 'Noor'], ['clinic_type', s(b.clinic_type)],\n  ['address', s(b.address)], ['map_link', s(b.map_link)], ['parking', s(b.parking)], ['currency', s(b.currency) || 'AED'],\n  ['owner_phone', s(b.owner_phone).replace(/\\D/g,'')], ['clinic_whatsapp', s(b.clinic_whatsapp).replace(/\\D/g,'')], ['support_phone', s(b.support_phone).replace(/\\D/g,'')],\n  ...days.map(d => ['hours_' + d, s(hours[d]) || 'closed']),\n  ['closed_dates', s(b.closed_dates)], ['slot_minutes', s(b.slot_minutes) || '30'], ['late_cancel_hours', s(b.late_cancel_hours)],\n  ['payment', s(b.payment)], ['insurance', s(b.insurance)], ['languages', s(b.languages) || 'English, Arabic'],\n  ['tone', s(b.tone)], ['emergency_number', s(b.emergency_number) || '999'], ['google_review_link', s(b.google_review_link)],\n  ['policies', s(b.policies)], ['website', s(b.website)]\n];\nconst services = arr(b.services).filter(x => x && s(x.name));\nconst doctors = arr(b.doctors).filter(x => x && s(x.name));\nconst faqs = arr(b.faqs).filter(x => x && s(x.q));\nconst prices = services.map(x => [s(x.name), s(x.price), x.from ? 'yes' : '', s(x.minutes), s(x.name).toLowerCase(), s(x.doctor)]);\nconst docs = doctors.map(x => [s(x.name), s(x.specialty), s(x.gender), s(x.services).toLowerCase() + (x.days ? ' | days: ' + s(x.days) : '') + (x.languages ? ' | ' + s(x.languages) : '')]);\nconst kb = faqs.map(x => [s(x.q), s(x.a)]);\nconst need = [];\nif (!s(b.clinic_name)) need.push('clinic name');\nif (!s(b.contact_phone)) need.push('contact WhatsApp');\nif (!services.length) need.push('services & prices');\nif (!doctors.length) need.push('doctors');\nif (!days.some(d => s(hours[d]) && s(hours[d]).toLowerCase() !== 'closed')) need.push('opening hours');\nif (!s(b.address)) need.push('address');\nconst tsv = rows => rows.map(r => r.join('\\t')).join('\\n');\nreturn [{ json: {\n  spam: false,\n  clinic_name: s(b.clinic_name), contact_name: s(b.contact_name), contact_phone: s(b.contact_phone).replace(/\\D/g,''),\n  contact_email: s(b.contact_email), clinic_type: s(b.clinic_type), plan: s(b.plan), pilot_mode: s(b.pilot_mode) || 'fast', lang: s(b.lang) || 'en',\n  payload_json: JSON.stringify(b).slice(0, 60000),\n  clinic_setup_tsv: 'setting\\tvalue\\n' + tsv(setup),\n  prices_tsv: 'service\\tprice\\tfrom\\tminutes\\tkeywords\\tnotes\\n' + tsv(prices),\n  doctors_tsv: 'dentist\\tspecialty\\tgender\\tkeywords\\n' + tsv(docs),\n  knowledge_tsv: 'question\\tanswer\\n' + tsv(kb),\n  missing: need.join(', '),\n  counts: services.length + ' services, ' + doctors.length + ' doctors, ' + faqs.length + ' FAQs'\n} }];"
+      }
+    },
+    {
+      "id": "52c37a2e-a2f9-4148-8728-9df2d35f33c5",
+      "name": "Real Submission?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.spam }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "af365503-1eb0-4252-ad4a-67d91a6c0fea",
+      "name": "Save Intake",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_ME",
+          "cachedResultName": "REPLACE_ME"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "clinic_name": "={{ $json.clinic_name }}",
+            "contact_name": "={{ $json.contact_name }}",
+            "contact_phone": "={{ $json.contact_phone }}",
+            "contact_email": "={{ $json.contact_email }}",
+            "clinic_type": "={{ $json.clinic_type }}",
+            "plan": "={{ $json.plan }}",
+            "pilot_mode": "={{ $json.pilot_mode }}",
+            "payload_json": "={{ $json.payload_json }}",
+            "clinic_setup_tsv": "={{ $json.clinic_setup_tsv }}",
+            "prices_tsv": "={{ $json.prices_tsv }}",
+            "doctors_tsv": "={{ $json.doctors_tsv }}",
+            "knowledge_tsv": "={{ $json.knowledge_tsv }}",
+            "missing": "={{ $json.missing }}",
+            "status": "new",
+            "lang": "={{ $json.lang }}"
+          },
+          "schema": [
+            {
+              "id": "clinic_name",
+              "displayName": "clinic_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact_phone",
+              "displayName": "contact_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact_email",
+              "displayName": "contact_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "clinic_type",
+              "displayName": "clinic_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "plan",
+              "displayName": "plan",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "pilot_mode",
+              "displayName": "pilot_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payload_json",
+              "displayName": "payload_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "clinic_setup_tsv",
+              "displayName": "clinic_setup_tsv",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prices_tsv",
+              "displayName": "prices_tsv",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "doctors_tsv",
+              "displayName": "doctors_tsv",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "knowledge_tsv",
+              "displayName": "knowledge_tsv",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "missing",
+              "displayName": "missing",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lang",
+              "displayName": "lang",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "eb904f85-4a18-4159-a7ae-bcaa2f4288f4",
+      "name": "Alert Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_ME",
+        "recipientPhoneNumber": "000000000000",
+        "messageType": "text",
+        "textBody": "=🆕 Pilot setup form received\nClinic: {{ $('Build Setup Pack').item.json.clinic_name }} ({{ $('Build Setup Pack').item.json.clinic_type }})\nContact: {{ $('Build Setup Pack').item.json.contact_name }} +{{ $('Build Setup Pack').item.json.contact_phone }}\nMode: {{ $('Build Setup Pack').item.json.pilot_mode }} · Plan: {{ $('Build Setup Pack').item.json.plan }}\n{{ $('Build Setup Pack').item.json.counts }}\nMissing: {{ $('Build Setup Pack').item.json.missing || 'nothing' }}\nSaved in data table halora_pilot_intake."
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "id": "59c85ce3-1e96-414a-becb-8afa01e9c5b2",
+      "name": "Reply OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, missing: $('Build Setup Pack').item.json.missing || '' }) }}"
+      }
+    },
+    {
+      "id": "bdc9c3e2-75ac-4c04-8802-cbf9f38cbc8a",
+      "name": "Reply OK (ignored)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":true}"
+      }
+    },
+    {
+      "id": "2e0d5d9a-08d9-4ab8-aa41-babcd6d56d19",
+      "name": "Auto Setup Clinic",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        },
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Halora – Clinic Auto-Setup",
+          "mode": "id",
+          "value": "a0peiroNDPpHUFP7"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "intake_id",
+              "id": "intake_id",
+              "required": false,
+              "type": "number"
+            }
+          ],
+          "value": {
+            "intake_id": "={{ $('Save Intake').item.json.id }}"
+          }
+        }
+      },
+      "notes": "Switch: disable this node to stop automatic clinic setup.",
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Pilot Intake Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build Setup Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Setup Pack": {
+      "main": [
+        [
+          {
+            "node": "Real Submission?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Real Submission?": {
+      "main": [
+        [
+          {
+            "node": "Save Intake",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply OK (ignored)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Intake": {
+      "main": [
+        [
+          {
+            "node": "Alert Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Owner": {
+      "main": [
+        [
+          {
+            "node": "Reply OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply OK": {
+      "main": [
+        [
+          {
+            "node": "Auto Setup Clinic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
